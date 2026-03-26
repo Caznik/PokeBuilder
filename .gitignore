@@ -1,0 +1,44 @@
+# Project-specific
+.devcontainer/
+.pnpm-store/
+.venv/
+workflows/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pytest_cache/
+*.mypy_cache/
+*.coverage
+coverage.xml
+
+# Virtual environments
+env/
+venv/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs / Editors
+.vscode/
+.idea/
+
+# Node / pnpm
+node_modules/
+.pnpm-debug.log
+
+# Environment variables
+.env
+.env.*
