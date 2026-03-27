@@ -21,7 +21,7 @@ PokeBuilder is a Pokemon team building and analysis application. It ingests data
 
 ### Key Features
 
-- **Data Ingestion**: Automated fetchers for Pokemon, abilities, and types
+- **Data Ingestion**: Automated fetchers for Pokemon, abilities, types, and moves
 - **REST API**: FastAPI-based API for querying ingested data
 - **PostgreSQL Database**: Normalized schema for efficient data storage
 - **Docker Support**: Containerized deployment for easy setup
@@ -111,6 +111,78 @@ For comprehensive details on Sprint 1, see: [Sprint 1 Documentation](./sprint_1_
 
 ---
 
+### Sprint 2: Pokemon Moves
+
+**Status**: ✅ Completed  
+**Duration**: Sprint 2  
+**Goal**: Add comprehensive Pokemon moves data and API endpoints
+
+#### Summary
+
+Sprint 2 focused on implementing Pokemon moves functionality, building upon the foundation established in Sprint 1. We successfully implemented:
+
+1. **Move Data Fetcher**: `pokemon_moves_fetcher.py`
+   - Fetches all moves from PokeAPI with detailed stats (power, accuracy, PP, type, category)
+   - Extracts move effects and descriptions
+   - Establishes Pokemon-move relationships with learn methods and levels
+   - Parallel fetching for optimal performance
+
+2. **Enhanced Database Schema**: Three new tables
+   - `moves`: Complete move data including power, accuracy, PP, type, category, and effects
+   - `move_categories`: Pre-populated with physical/special/status categories
+   - `pokemon_moves`: Many-to-many junction table tracking learn methods and levels
+
+3. **Extended REST API**: New endpoints for moves
+   - `/moves/` - List and filter moves by type, category, or name
+   - `/moves/{move_id}` - Get detailed move information with Pokemon that can learn it
+   - `/moves/categories/` - List move categories (physical/special/status)
+   - `/moves/pokemon/{pokemon_id}/moves` - Get all moves a Pokemon can learn
+
+4. **Bug Fixes**: Fixed column naming inconsistency in moves.sql schema
+
+#### Technical Highlights
+
+- **Move Categories**: Mapped PokeAPI's damage_class to our category system (physical/special/status)
+- **Learn Methods**: Comprehensive tracking of how Pokemon learn moves (level-up, TM, tutor, etc.)
+- **Effect Text**: English move descriptions extracted and stored
+- **Query Safety**: All queries use parameterized statements for SQL injection prevention
+
+#### Deliverables
+
+- ✅ Move data fetcher script (`src/ingestors/pokemon_moves_fetcher.py`)
+- ✅ Move database tables and schemas (`moves`, `move_categories`, `pokemon_moves`)
+- ✅ Move API endpoints with filtering and pagination
+- ✅ Move Pydantic models for request/response validation
+- ✅ Fixed schema typo (category → category_id)
+
+#### Files Created/Modified
+
+```
+src/
+├── ingestors/
+│   └── pokemon_moves_fetcher.py          # NEW
+└── api/
+    ├── main.py                           # MODIFIED
+    ├── models/
+    │   ├── __init__.py                   # MODIFIED
+    │   └── move.py                       # NEW
+    └── routes/
+        ├── __init__.py                   # MODIFIED
+        └── move.py                       # NEW
+
+resources/sql/tables_schemas/
+└── moves.sql                             # MODIFIED (bugfix)
+
+documentation/
+└── sprint_2_documentation.md             # NEW
+```
+
+#### Detailed Documentation
+
+For comprehensive details on Sprint 2, see: [Sprint 2 Documentation](./sprint_2_documentation.md)
+
+---
+
 ### Next Sprint: TBD
 
 **Status**: 🔄 Planned  
@@ -129,14 +201,16 @@ Based on the current foundation, the next sprint could focus on:
    - Type effectiveness calculations
    - Stat comparison algorithms
    - Battle outcome prediction
+   - Move selection strategies
 
 3. **Advanced Search & Filtering**
    - Complex queries (e.g., "fire type Pokemon with high attack")
    - Stat range filtering
    - Multi-criteria search
+   - Move-based filtering (e.g., "Pokemon that can learn Surf")
 
 4. **Data Enhancement**
-   - Additional PokeAPI endpoints (moves, items, etc.)
+   - Additional PokeAPI endpoints (items, evolutions, etc.)
    - Caching layer for frequently accessed data
    - Data synchronization/updates
 
@@ -194,6 +268,7 @@ As the project grows, this section will be expanded to include:
    python src/ingestors/pokemon_fetcher.py
    python src/ingestors/pokemon_abilities_fetcher.py
    python src/ingestors/pokemon_types_fetcher.py
+   python src/ingestors/pokemon_moves_fetcher.py
    ```
 
 5. **Start the API**
@@ -232,28 +307,29 @@ This will start:
 │                  FastAPI                      │
 │              (REST Endpoints)                 │
 │                                               │
-│  ┌──────────┬──────────┬──────────┐           │
-│  │ Pokemon  │ Abilities│   Types  │           │
-│  │  Routes  │  Routes  │  Routes  │           │
-│  └────┬─────┴────┬─────┴────┬────┘           │
-│       └──────────┬──────────┘                  │
-│                  ▼                             │
-│           Database Layer                       │
-│         (psycopg2 + Connection Pool)         │
-└──────────────────┬─────────────────────────────┘
+│  ┌──────────┬──────────┬──────────┬──────────┐│
+│  │ Pokemon  │ Abilities│   Types  │   Moves  ││
+│  │  Routes  │  Routes  │  Routes  │  Routes  ││
+│  └────┬─────┴────┬─────┴────┬────┴────┬───┘│
+│       └──────────┴──────────┘          │     │
+│                  ▼                       │     │
+│           Database Layer                 │     │
+│         (psycopg2 + Connection Pool)   │     │
+└──────────────────┬─────────────────────┘     │
                    │ SQL
                    ▼
 ┌─────────────────────────────────────────────┐
 │              PostgreSQL Database              │
 │                                               │
-│  ┌─────────┬──────────┬─────────────────┐     │
-│  │ pokemon │ abilities│      types      │     │
-│  └────┬────┴─────┬────┴────────┬────────┘     │
-│       │          │             │              │
-│  ┌────┴──────────┴─────┐ ┌────┴──────────┐   │
-│  │  pokemon_abilities   │ │ pokemon_types │   │
-│  └──────────────────────┘ └───────────────┘   │
-└───────────────────────────────────────────────┘
+│  ┌─────────┬──────────┬──────────┬────────┐ │
+│  │ pokemon │ abilities│   types  │ moves  │ │
+│  └────┬────┴─────┬────┴─────┬────┴───┬────┘ │
+│       │          │          │        │       │
+│  ┌────┴──────────┴─────┐ ┌┴─────────┴────┐ │
+│  │  pokemon_abilities   │ │pokemon_types  │ │
+│  └──────────────────────┘ │pokemon_moves   │ │
+│                           └────────────────┘ │
+└─────────────────────────────────────────────┘
                    ▲
                    │ Data
                    │ Fetching
