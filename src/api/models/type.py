@@ -2,7 +2,7 @@
 """Pydantic models for Type data."""
 
 from pydantic import BaseModel
-from typing import List
+from typing import Dict, List
 
 
 class Type(BaseModel):
@@ -17,3 +17,18 @@ class Type(BaseModel):
 class TypeDetail(Type):
     """Type model with relationships."""
     pokemon_count: int = 0
+
+
+class MultiplierResponse(BaseModel):
+    """Response model for single multiplier query."""
+    multiplier: float
+
+
+class AllMultipliersResponse(BaseModel):
+    """Response model for all multipliers against a defender."""
+    multipliers: Dict[str, float]
+
+
+class TypeList(BaseModel):
+    """List of all types."""
+    items: List[Type]
