@@ -270,6 +270,82 @@ For comprehensive details on Sprint 3, see: [Sprint 3 Documentation](./sprint_3_
 
 ---
 
+### Sprint 4: Stat Calculation Engine
+
+**Status**: ✅ Completed  
+**Duration**: Sprint 4  
+**Goal**: Build the Stat Calculation Engine supporting IVs, EVs, Natures, and final stat computation
+
+#### Summary
+
+Sprint 4 implemented the foundational stat calculation system for competitive Pokemon analysis. This sprint focused on:
+
+1. **Stat Calculation Database**: New `natures` table storing all 25 natures with their stat modifiers.
+
+2. **Stat Calculation Service** (`src/api/services/stat_service.py`):
+   - Complete implementation of official Pokemon stat formulas
+   - Support for IVs (0-31), EVs (0-252), and Natures (+/- 10%)
+   - Strict validation of EV constraints (total ≤ 510)
+   - Competitive-standard defaults (IV 31, EV 0, Level 100)
+
+3. **New API Endpoint**:
+   - `POST /stats/calculate` - Calculate final stats with full customization
+   - Request validation with Pydantic models
+   - Detailed error messages for validation failures
+
+4. **Comprehensive Testing**:
+   - Unit tests with mocked database
+   - API integration tests with FastAPI TestClient
+   - All validation rules tested
+
+#### Technical Highlights
+
+- **Formula Accuracy**: Uses official Pokemon stat formulas
+- **Validation Layer**: Enforces all EV/IV constraints
+- **Default Values**: IV 31, EV 0, Level 100 (competitive standard)
+- **Case Insensitive**: Pokemon and nature names are case-insensitive
+- **Future-Proof**: Designed for damage calculations and team analysis
+
+#### Deliverables
+
+- ✅ Natures database table and schema
+- ✅ Stat calculation service with formulas
+- ✅ IV/EV validation implementation
+- ✅ Stat calculation API endpoint
+- ✅ Comprehensive unit and integration tests
+- ✅ Complete documentation
+
+#### Files Created/Modified
+
+```
+resources/sql/tables_schemas/
+└── natures.sql                       # NEW
+
+src/api/services/
+├── __init__.py                       # MODIFIED
+└── stat_service.py                   # NEW
+
+src/api/models/
+└── stat.py                           # NEW
+
+src/api/routes/
+├── __init__.py                       # MODIFIED
+└── stat.py                           # NEW
+
+tests/
+├── test_stat_service.py              # NEW
+└── test_stat_api.py                  # NEW
+
+documentation/
+└── sprint_4_documentation.md         # NEW
+```
+
+#### Detailed Documentation
+
+For comprehensive details on Sprint 4, see: [Sprint 4 Documentation](./sprint_4_documentation.md)
+
+---
+
 ### Next Sprint: TBD
 
 **Status**: 🔄 Planned  
