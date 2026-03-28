@@ -117,6 +117,12 @@ For comprehensive details on Sprint 1, see: [Sprint 1 Documentation](./sprint_1_
 **Duration**: Sprint 2  
 **Goal**: Add comprehensive Pokemon moves data and API endpoints
 
+### Sprint 3: Type Effectiveness Engine
+
+**Status**: ✅ Completed  
+**Duration**: Sprint 3  
+**Goal**: Build the foundational intelligence layer for type-based calculations
+
 #### Summary
 
 Sprint 2 focused on implementing Pokemon moves functionality, building upon the foundation established in Sprint 1. We successfully implemented:
@@ -180,6 +186,87 @@ documentation/
 #### Detailed Documentation
 
 For comprehensive details on Sprint 2, see: [Sprint 2 Documentation](./sprint_2_documentation.md)
+
+---
+
+### Sprint 3: Type Effectiveness Engine
+
+**Status**: ✅ Completed  
+**Duration**: Sprint 3  
+**Goal**: Build the foundational intelligence layer for type-based calculations
+
+#### Summary
+
+Sprint 3 implemented the Type Effectiveness Engine, the core intelligence layer that powers all type-based calculations. This sprint focused on:
+
+1. **Type Effectiveness Database**: New `type_effectiveness` table storing the complete 18×18 type matrix with foreign keys to the `types` table.
+
+2. **High-Performance Engine** (`src/api/services/type_service.py`):
+   - In-memory matrix caching for O(1) lookups
+   - Zero database queries during API requests
+   - Dual-type support via multiplier multiplication
+   - Future-proof `all_multipliers_against()` function for coverage analysis
+
+3. **New API Endpoints**:
+   - `GET /types/multiplier?move=fire&defender=grass` - Calculate single multiplier
+   - `GET /types/multipliers?defender=grass,steel` - Get all attacker multipliers
+
+4. **Comprehensive Testing**:
+   - Unit tests with synthetic data (no database required)
+   - API integration tests with FastAPI TestClient
+   - All required test cases passing
+
+5. **Seeder Script** (`src/ingestors/type_effectiveness_seeder.py`):
+   - Clean-install approach
+   - Populates 300+ type effectiveness relationships
+
+#### Technical Highlights
+
+- **Matrix-Based Design**: Linear algebra approach over an 18×18 effectiveness matrix
+- **Performance**: O(1) lookups with in-memory caching
+- **Dual-Type Support**: Proper handling via multiplier multiplication (e.g., Fire vs Grass/Steel = 4.0)
+- **Future-Proof**: `all_multipliers_against()` enables team weakness detection and coverage scoring
+- **Clean Architecture**: Service layer separates business logic from API routes
+
+#### Deliverables
+
+- ✅ Type effectiveness database table and schema
+- ✅ Seeder script with complete type chart
+- ✅ Type effectiveness service with in-memory caching
+- ✅ Multiplier calculation API endpoints
+- ✅ Comprehensive unit and integration tests
+- ✅ Complete documentation
+
+#### Files Created/Modified
+
+```
+resources/sql/tables_schemas/
+└── type_effectiveness.sql          # NEW
+
+src/ingestors/
+└── type_effectiveness_seeder.py    # NEW
+
+src/api/services/
+├── __init__.py                     # NEW
+└── type_service.py                 # NEW
+
+src/api/models/
+└── type.py                         # MODIFIED (added response models)
+
+src/api/routes/
+└── type.py                         # MODIFIED (added multiplier endpoints)
+
+tests/
+├── test_type_service.py            # NEW (unit tests)
+└── test_type_api.py                # NEW (API integration tests)
+
+documentation/
+└── sprint_3_documentation.md       # NEW
+```
+
+#### Detailed Documentation
+
+For comprehensive details on Sprint 3, see: [Sprint 3 Documentation](./sprint_3_documentation.md)
 
 ---
 

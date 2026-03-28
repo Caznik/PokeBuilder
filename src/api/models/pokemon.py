@@ -1,18 +1,17 @@
 # src/api/models/pokemon.py
 """Pydantic models for Pokemon data."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 
 class PokemonBase(BaseModel):
     """Base Pokemon model with core fields."""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     name: str
     generation: Optional[int] = None
-    
-    class Config:
-        from_attributes = True
 
 
 class PokemonStats(BaseModel):
