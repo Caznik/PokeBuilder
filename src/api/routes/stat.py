@@ -30,8 +30,8 @@ def calculate_stats_endpoint(payload: StatInput):
     try:
         with get_db_connection() as conn:
             # Cast from Dict[StatKey, int] to Dict[str, int] for service compatibility
-            evs: Dict[str, int] = {k: v for k, v in payload.evs.items()}
-            ivs: Dict[str, int] = {k: v for k, v in payload.ivs.items()}
+            evs: Dict[str, int] = payload.evs.model_dump()
+            ivs: Dict[str, int] = payload.ivs.model_dump()
             stats = calculate_stats(
                 conn=conn,
                 pokemon_name=payload.pokemon,
