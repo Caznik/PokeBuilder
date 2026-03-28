@@ -1,17 +1,16 @@
 # src/api/models/type.py
 """Pydantic models for Type data."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Dict, List
 
 
 class Type(BaseModel):
     """Type model."""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     name: str
-    
-    class Config:
-        from_attributes = True
 
 
 class TypeDetail(Type):

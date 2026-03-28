@@ -1,18 +1,17 @@
 # src/api/models/ability.py
 """Pydantic models for Ability data."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 
 class Ability(BaseModel):
     """Ability model."""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     name: str
     description: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
 
 
 class AbilityPokemon(BaseModel):

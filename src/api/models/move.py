@@ -1,21 +1,22 @@
 # src/api/models/move.py
 """Pydantic models for Move data."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 
 class MoveCategory(BaseModel):
     """Move category model (physical/special/status)."""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     name: str
-    
-    class Config:
-        from_attributes = True
 
 
 class Move(BaseModel):
     """Move model."""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     name: str
     type_id: int
@@ -24,9 +25,6 @@ class Move(BaseModel):
     pp: Optional[int] = None
     category_id: int
     effect: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
 
 
 class PokemonMoveEntry(BaseModel):

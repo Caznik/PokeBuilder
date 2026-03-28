@@ -29,6 +29,69 @@ def list_types():
         ]
 
 
+# Import service layer for effectiveness calculations
+from ..services.type_service import calculate_damage_multiplier, all_multipliers_against, get_all_attacker_types
+from ..models.type import MultiplierResponse, AllMultipliersResponse
+
+
+@router.get("/multiplier", response_model=MultiplierResponse)
+def get_type_multiplier(
+    move: str = Query(..., description="Attacking move type (e.g., 'fire')"),
+    defender: str = Query(..., description="Defender type(s), comma-separated (e.g., 'grass' or 'grass,steel')")
+):
+    """Get the damage multiplier for a move type against defender type(s).
+    
+    Examples:
+        - /types/multiplier?move=fire&defender=grass       → 2.0
+        - /types/multiplier?move=fire&defender=grass,steel  → 4.0
+        - /types/multiplier?move=electric&defender=ground     → 0.0
+    """
+    try:
+        # Parse defender types (comma-separated)
+        defender_types = [t.strip().lower() for t in defender.split(',')]
+        
+        # Calculate multiplier
+        multiplier = calculate_damage_multiplier(move.lower(), defender_types)
+        
+        return MultiplierResponse(multiplier=multiplier)
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/multipliers", response_model=AllMultipliersResponse)
+def get_all_type_multipliers(
+    defender: str = Query(..., description="Defender type(s), comma-separated (e.g., 'grass,steel')")
+):
+    """Get all damage multipliers against a defender.
+    
+    Returns a mapping of all attacker types to their damage multipliers.
+    This is useful for analyzing type coverage and weaknesses.
+    
+    Example:
+        - /types/multipliers?defender=grass,steel
+        
+        Returns multipliers like:
+        {
+            "normal": 0.5,
+            "fire": 4.0,
+            "water": 0.5,
+            ...
+        }
+    """
+    try:
+        # Parse defender types
+        defender_types = [t.strip().lower() for t in defender.split(',')]
+        
+        # Get all multipliers
+        multipliers = all_multipliers_against(defender_types)
+        
+        return AllMultipliersResponse(multipliers=multipliers)
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/{type_id}", response_model=TypeDetail)
 def get_type(type_id: int):
     """Get a specific type by ID with Pokemon count."""
@@ -129,66 +192,3 @@ def get_pokemon_by_type(type_id: int):
             }
             for row in rows
         ]
-
-
-# Import service layer for effectiveness calculations
-from ..services.type_service import calculate_damage_multiplier, all_multipliers_against, get_all_attacker_types
-from ..models.type import MultiplierResponse, AllMultipliersResponse
-
-
-@router.get("/multiplier", response_model=MultiplierResponse)
-def get_type_multiplier(
-    move: str = Query(..., description="Attacking move type (e.g., 'fire')"),
-    defender: str = Query(..., description="Defender type(s), comma-separated (e.g., 'grass' or 'grass,steel')")
-):
-    """Get the damage multiplier for a move type against defender type(s).
-    
-    Examples:
-        - /types/multiplier?move=fire&defender=grass       → 2.0
-        - /types/multiplier?move=fire&defender=grass,steel  → 4.0
-        - /types/multiplier?move=electric&defender=ground     → 0.0
-    """
-    try:
-        # Parse defender types (comma-separated)
-        defender_types = [t.strip().lower() for t in defender.split(',')]
-        
-        # Calculate multiplier
-        multiplier = calculate_damage_multiplier(move.lower(), defender_types)
-        
-        return MultiplierResponse(multiplier=multiplier)
-        
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/multipliers", response_model=AllMultipliersResponse)
-def get_all_type_multipliers(
-    defender: str = Query(..., description="Defender type(s), comma-separated (e.g., 'grass,steel')")
-):
-    """Get all damage multipliers against a defender.
-    
-    Returns a mapping of all attacker types to their damage multipliers.
-    This is useful for analyzing type coverage and weaknesses.
-    
-    Example:
-        - /types/multipliers?defender=grass,steel
-        
-        Returns multipliers like:
-        {
-            "normal": 0.5,
-            "fire": 4.0,
-            "water": 0.5,
-            ...
-        }
-    """
-    try:
-        # Parse defender types
-        defender_types = [t.strip().lower() for t in defender.split(',')]
-        
-        # Get all multipliers
-        multipliers = all_multipliers_against(defender_types)
-        
-        return AllMultipliersResponse(multipliers=multipliers)
-        
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
