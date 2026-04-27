@@ -68,7 +68,7 @@ class MockConnection:
 def client():
     """Create a TestClient with mocked database."""
     # Patch the database connection before importing/routing
-    with patch("src.api.db.get_db_connection", return_value=MockConnection()):
+    with patch("src.api.routes.stat.get_db_connection", return_value=MockConnection()):
         with TestClient(app) as test_client:
             yield test_client
 
@@ -260,7 +260,7 @@ class TestCalculateEndpoint:
             def __exit__(self, *args):
                 pass
 
-        with patch("src.api.db.get_db_connection", return_value=MockConnectionNoPokemon()):
+        with patch("src.api.routes.stat.get_db_connection", return_value=MockConnectionNoPokemon()):
             with TestClient(app) as test_client:
                 response = test_client.post("/stats/calculate", json={
                     "pokemon": "unknown_pokemon"
@@ -302,7 +302,7 @@ class TestCalculateEndpoint:
             def __exit__(self, *args):
                 pass
 
-        with patch("src.api.db.get_db_connection", return_value=MockConnectionNoNature()):
+        with patch("src.api.routes.stat.get_db_connection", return_value=MockConnectionNoNature()):
             with TestClient(app) as test_client:
                 response = test_client.post("/stats/calculate", json={
                     "pokemon": "garchomp",
