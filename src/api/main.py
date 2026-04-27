@@ -3,7 +3,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import pokemon_router, ability_router, type_router, move_router, stat_router
+from .routes import pokemon_router, ability_router, type_router, move_router, stat_router, competitive_router
 
 app = FastAPI(
     title="PokeBuilder API",
@@ -26,6 +26,7 @@ app.include_router(ability_router)
 app.include_router(type_router)
 app.include_router(move_router)
 app.include_router(stat_router)
+app.include_router(competitive_router)
 
 
 @app.get("/")
@@ -39,7 +40,8 @@ def root():
             "pokemon": "/pokemon",
             "abilities": "/abilities",
             "types": "/types",
-            "moves": "/moves"
+            "moves": "/moves",
+            "competitive-sets": "/competitive-sets",
         }
     }
 

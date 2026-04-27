@@ -8,6 +8,7 @@ from .type_service import (
     all_multipliers_against,
 )
 from .stat_service import calculate_stats
+from .competitive_service import get_sets_for_pokemon
 
 __all__ = [
     "get_type_id",
@@ -15,4 +16,5 @@ __all__ = [
     "calculate_damage_multiplier",
     "all_multipliers_against",
     "calculate_stats",
+    "get_sets_for_pokemon",
 ]

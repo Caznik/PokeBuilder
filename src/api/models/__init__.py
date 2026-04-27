@@ -5,6 +5,7 @@ from .pokemon import Pokemon, PokemonList, PokemonDetail
 from .ability import Ability, AbilityDetail
 from .type import Type
 from .move import Move, MoveDetail, MoveCategory, MoveList
+from .competitive import CompetitiveSet, CompetitiveSetEvs, CompetitiveSetResponse
 
 __all__ = [
     "Pokemon",
@@ -16,5 +17,8 @@ __all__ = [
     "Move",
     "MoveDetail",
     "MoveCategory",
-    "MoveList"
+    "MoveList",
+    "CompetitiveSet",
+    "CompetitiveSetEvs",
+    "CompetitiveSetResponse",
 ]
