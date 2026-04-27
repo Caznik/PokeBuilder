@@ -1,0 +1,86 @@
+# tests/test_team_analysis.py
+"""Unit tests for the analyze_team combiner."""
+
+import pytest
+from unittest.mock import patch, MagicMock
+
+from src.api.models.team import PokemonBuild
+from src.api.services.team_analysis import analyze_team
+
+BASE = {"hp": 250, "attack": 200, "defense": 150,
+        "sp_attack": 150, "sp_defense": 150, "speed": 200}
+
+BUILDS = [
+    PokemonBuild("garchomp", 1, ["dragon", "ground"], "jolly", None, None, BASE, [])
+    for _ in range(6)
+]
+
+FAKE_VALIDATION = {
+    "valid":  False,
+    "issues": ["Missing tank"],
+    "roles":  {"physical_sweeper": 2, "special_sweeper": 0, "tank": 0,
+               "hazard_setter": 1, "hazard_removal": 0, "pivot": 1, "support": 0},
+}
+FAKE_WEAKNESSES = {
+    "weaknesses":  {"ice": 4, "fairy": 2},
+    "resistances": {"fire": 3},
+}
+FAKE_COVERAGE = {
+    "covered_types": ["grass", "steel"],
+    "missing_types": ["water", "fairy"],
+}
+
+
+def _run(builds=BUILDS):
+    with patch("src.api.services.team_analysis.validate_team",
+               return_value=FAKE_VALIDATION) as mock_val, \
+         patch("src.api.services.team_analysis.analyze_weaknesses",
+               return_value=FAKE_WEAKNESSES) as mock_weak, \
+         patch("src.api.services.team_analysis.analyze_coverage",
+               return_value=FAKE_COVERAGE) as mock_cov:
+        result = analyze_team(builds)
+    return result, mock_val, mock_weak, mock_cov
+
+
+class TestAnalyzeTeam:
+
+    def test_calls_validate_team(self):
+        _, mock_val, _, _ = _run()
+        mock_val.assert_called_once_with(BUILDS)
+
+    def test_calls_analyze_weaknesses(self):
+        _, _, mock_weak, _ = _run()
+        mock_weak.assert_called_once_with(BUILDS)
+
+    def test_calls_analyze_coverage(self):
+        _, _, _, mock_cov = _run()
+        mock_cov.assert_called_once_with(BUILDS)
+
+    def test_valid_propagated(self):
+        result, *_ = _run()
+        assert result["valid"] == FAKE_VALIDATION["valid"]
+
+    def test_issues_propagated(self):
+        result, *_ = _run()
+        assert result["issues"] == FAKE_VALIDATION["issues"]
+
+    def test_roles_propagated(self):
+        result, *_ = _run()
+        assert result["roles"] == FAKE_VALIDATION["roles"]
+
+    def test_weaknesses_propagated(self):
+        result, *_ = _run()
+        assert result["weaknesses"] == FAKE_WEAKNESSES["weaknesses"]
+
+    def test_resistances_propagated(self):
+        result, *_ = _run()
+        assert result["resistances"] == FAKE_WEAKNESSES["resistances"]
+
+    def test_coverage_propagated(self):
+        result, *_ = _run()
+        assert result["coverage"] == FAKE_COVERAGE
+
+    def test_all_expected_keys_present(self):
+        result, *_ = _run()
+        for key in ("valid", "issues", "roles", "weaknesses", "resistances", "coverage"):
+            assert key in result, f"Missing key: {key}"

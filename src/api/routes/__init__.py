@@ -7,5 +7,7 @@ from .type import router as type_router
 from .move import router as move_router
 from .stat import router as stat_router
 from .competitive import router as competitive_router
+from .team import router as team_router
 
-__all__ = ["pokemon_router", "ability_router", "type_router", "move_router", "stat_router", "competitive_router"]
+__all__ = ["pokemon_router", "ability_router", "type_router", "move_router",
+           "stat_router", "competitive_router", "team_router"]
