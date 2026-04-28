@@ -2,6 +2,7 @@
 """Guided random team generation engine."""
 
 import random
+import re
 from typing import Any, NamedTuple
 
 from ..models.generation import GenerationConstraints
@@ -9,11 +10,31 @@ from ..models.team import PokemonBuild
 from .team_loader import load_build
 from .team_analysis import analyze_team
 from .role_service import detect_roles
+from .team_scorer import score_team
 
 MAX_RESULTS = 5
 MAX_ITERATIONS = 100
 WEAKNESS_THRESHOLD = 3
 HEURISTIC_RETRY_BUDGET = 10
+
+# Matches mega, gmax, and primal form suffixes — these are battle-only
+# transformations of the base species and must not share a team slot.
+# Regional forms (-alolan, -galarian, etc.) are intentionally excluded:
+# they are distinct species with different typings and competitive roles.
+_FORM_SUFFIX_RE = re.compile(r'-(mega(-[xy])?|gmax|primal)$', re.IGNORECASE)
+
+
+def _base_species(name: str) -> str:
+    """Return the base species name by stripping mega/gmax/primal suffixes.
+
+    Args:
+        name: Pokémon name, possibly including a form suffix.
+
+    Returns:
+        Lowercase name with mega/gmax/primal suffix removed.
+        Regional forms (alolan, galarian, etc.) are preserved unchanged.
+    """
+    return _FORM_SUFFIX_RE.sub('', name.lower())
 
 
 class PoolEntry(NamedTuple):
@@ -102,7 +123,8 @@ def _sample_candidate(
     """Build one 6-member candidate team using sampling heuristics.
 
     Applies three heuristics during slot-by-slot construction:
-      1. No duplicate Pokémon (by name).
+      1. No duplicate base species (blocks mega/gmax alongside their base form;
+         regional forms are treated as distinct species and are allowed).
       2. No primary type appearing 3+ times in the partial team.
       3. Role diversity: no more than 2 physical or special sweepers.
 
@@ -120,7 +142,7 @@ def _sample_candidate(
         keys pokemon_name, set_id, set_name. May be shorter than 6 if the pool
         is exhausted mid-construction.
     """
-    chosen_names: set[str] = set()
+    chosen_species: set[str] = set()   # tracks _base_species() of committed members
     type_counts: dict[str, int] = {}
     sweeper_counts: dict[str, int] = {"physical_sweeper": 0, "special_sweeper": 0}
     members: list[dict] = []
@@ -134,7 +156,7 @@ def _sample_candidate(
             "set_name": entry.set_name,
         })
         builds.append(build)
-        chosen_names.add(entry.pokemon_name)
+        chosen_species.add(_base_species(entry.pokemon_name))
         if entry.primary_type:
             type_counts[entry.primary_type] = type_counts.get(entry.primary_type, 0) + 1
         for role in roles:
@@ -149,23 +171,30 @@ def _sample_candidate(
             continue
         seen_include.add(name_lower)
         candidates = [e for e in pool if e.pokemon_name.lower() == name_lower]
-        if not candidates:
-            continue
-        entry = rng.choice(candidates)
-        _commit(entry, load_build(conn, entry.pokemon_name, entry.set_id))
+        rng.shuffle(candidates)
+        for entry in candidates:
+            try:
+                build = load_build(conn, entry.pokemon_name, entry.set_id)
+                _commit(entry, build)
+                break
+            except ValueError:
+                continue
 
     # Fill remaining slots
     remaining_slots = 6 - len(members)
     for _ in range(remaining_slots):
-        # Rule 1 & 2: no duplicates, no primary type already at 3+
+        # Rule 1 & 2: no duplicate base species, no primary type already at 3+
         eligible = [
             e for e in pool
-            if e.pokemon_name not in chosen_names
+            if _base_species(e.pokemon_name) not in chosen_species
             and type_counts.get(e.primary_type, 0) < 3
         ]
         if not eligible:
             # Relax Rule 2
-            eligible = [e for e in pool if e.pokemon_name not in chosen_names]
+            eligible = [
+                e for e in pool
+                if _base_species(e.pokemon_name) not in chosen_species
+            ]
         if not eligible:
             break
 
@@ -180,7 +209,10 @@ def _sample_candidate(
                 break
             entry = rng.choice(candidates)
             tried.add(entry.set_id)
-            build = load_build(conn, entry.pokemon_name, entry.set_id)
+            try:
+                build = load_build(conn, entry.pokemon_name, entry.set_id)
+            except ValueError:
+                continue
             roles = detect_roles(build)
             violates = (
                 ("physical_sweeper" in roles and sweeper_counts["physical_sweeper"] >= 2)
@@ -193,11 +225,18 @@ def _sample_candidate(
 
         if chosen_entry is None:
             # Relax Rule 3: accept any eligible candidate
-            entry = rng.choice(eligible)
-            chosen_entry = entry
-            chosen_build = load_build(conn, entry.pokemon_name, entry.set_id)
+            candidates = list(eligible)
+            rng.shuffle(candidates)
+            for entry in candidates:
+                try:
+                    chosen_build = load_build(conn, entry.pokemon_name, entry.set_id)
+                    chosen_entry = entry
+                    break
+                except ValueError:
+                    continue
 
-        _commit(chosen_entry, chosen_build)
+        if chosen_entry is not None:
+            _commit(chosen_entry, chosen_build)
 
     return members, builds
 
@@ -219,21 +258,6 @@ def _is_acceptable(report: dict) -> bool:
     max_weakness = max(report["weaknesses"].values(), default=0)
     return max_weakness < WEAKNESS_THRESHOLD
 
-
-def _score_team(report: dict) -> float:
-    """Compute a quality score for an accepted team.
-
-    Score starts at 1.0 (all rules satisfied) and is reduced by a weakness
-    penalty of 0.05 per weakness count in the worst type.
-
-    Args:
-        report: Analysis dict returned by analyze_team.
-
-    Returns:
-        Float score; higher is better.
-    """
-    max_weakness = max(report["weaknesses"].values(), default=0)
-    return 1.0 - (max_weakness * 0.05)
 
 
 def generate_teams(
@@ -284,8 +308,10 @@ def generate_teams(
             continue
         report = analyze_team(builds)
         if _is_acceptable(report):
+            scoring = score_team(report, builds)
             results.append({
-                "score": _score_team(report),
+                "score": scoring["score"],
+                "breakdown": scoring["breakdown"],
                 "members": members,
                 "analysis": report,
             })

@@ -4,6 +4,7 @@
 from pydantic import BaseModel
 
 from .team import CoverageResult
+from .scoring import ScoreBreakdown
 
 
 class GenerationConstraints(BaseModel):
@@ -32,6 +33,7 @@ class TeamAnalysis(BaseModel):
 
 class TeamResult(BaseModel):
     score: float
+    breakdown: ScoreBreakdown
     members: list[GenerationMember]
     analysis: TeamAnalysis
 

@@ -15,10 +15,10 @@ from src.api.services.team_generator import (
     WEAKNESS_THRESHOLD,
     PoolEntry,
     _apply_constraints,
+    _base_species,
     _build_pool,
     _is_acceptable,
     _sample_candidate,
-    _score_team,
     _validate_constraints,
     generate_teams,
 )
@@ -194,6 +194,45 @@ class TestValidateConstraints:
 
 
 # ---------------------------------------------------------------------------
+# _base_species
+# ---------------------------------------------------------------------------
+
+class TestBaseSpecies:
+    def test_plain_name_unchanged(self):
+        assert _base_species("garchomp") == "garchomp"
+
+    def test_strips_mega(self):
+        assert _base_species("garchomp-mega") == "garchomp"
+
+    def test_strips_mega_x(self):
+        assert _base_species("charizard-mega-x") == "charizard"
+
+    def test_strips_mega_y(self):
+        assert _base_species("mewtwo-mega-y") == "mewtwo"
+
+    def test_strips_gmax(self):
+        assert _base_species("snorlax-gmax") == "snorlax"
+
+    def test_strips_primal(self):
+        assert _base_species("kyogre-primal") == "kyogre"
+
+    def test_preserves_alolan(self):
+        assert _base_species("meowth-alolan") == "meowth-alolan"
+
+    def test_preserves_galarian(self):
+        assert _base_species("slowpoke-galarian") == "slowpoke-galarian"
+
+    def test_preserves_hisuian(self):
+        assert _base_species("typhlosion-hisui") == "typhlosion-hisui"
+
+    def test_lowercases_name(self):
+        assert _base_species("Garchomp-Mega") == "garchomp"
+
+    def test_lowercases_regional(self):
+        assert _base_species("Meowth-Alolan") == "meowth-alolan"
+
+
+# ---------------------------------------------------------------------------
 # _sample_candidate
 # ---------------------------------------------------------------------------
 
@@ -260,6 +299,51 @@ class TestSampleCandidate:
         # The retry budget may relax the rule if all candidates are sweepers
         assert len(members) == 6
 
+    def test_mega_and_base_not_both_chosen(self):
+        """garchomp and garchomp-mega share a base species — only one can appear."""
+        pool = [
+            PoolEntry("garchomp",      1, None, "dragon"),
+            PoolEntry("garchomp-mega", 2, None, "dragon"),
+            PoolEntry("ferrothorn",    3, None, "grass"),
+            PoolEntry("rotom-wash",    4, None, "electric"),
+            PoolEntry("clefable",      5, None, "fairy"),
+            PoolEntry("heatran",       6, None, "fire"),
+            PoolEntry("landorus",      7, None, "ground"),
+        ]
+        members, _ = self._patched(pool, [], MagicMock(), random.Random(0))
+        names = [m["pokemon_name"] for m in members]
+        assert not ("garchomp" in names and "garchomp-mega" in names)
+
+    def test_gmax_and_base_not_both_chosen(self):
+        """snorlax and snorlax-gmax share a base species — only one can appear."""
+        pool = [
+            PoolEntry("snorlax",      1, None, "normal"),
+            PoolEntry("snorlax-gmax", 2, None, "normal"),
+            PoolEntry("ferrothorn",   3, None, "grass"),
+            PoolEntry("rotom-wash",   4, None, "electric"),
+            PoolEntry("clefable",     5, None, "fairy"),
+            PoolEntry("heatran",      6, None, "fire"),
+            PoolEntry("landorus",     7, None, "ground"),
+        ]
+        members, _ = self._patched(pool, [], MagicMock(), random.Random(0))
+        names = [m["pokemon_name"] for m in members]
+        assert not ("snorlax" in names and "snorlax-gmax" in names)
+
+    def test_regional_forms_can_coexist(self):
+        """meowth and meowth-alolan are different species and may both appear."""
+        pool = [
+            PoolEntry("meowth",        1, None, "normal"),
+            PoolEntry("meowth-alolan", 2, None, "dark"),
+            PoolEntry("ferrothorn",    3, None, "grass"),
+            PoolEntry("rotom-wash",    4, None, "electric"),
+            PoolEntry("clefable",      5, None, "fairy"),
+            PoolEntry("heatran",       6, None, "fire"),
+        ]
+        # Pool has exactly 6 distinct base species → all must appear
+        members, _ = self._patched(pool, [], MagicMock(), random.Random(0))
+        names = [m["pokemon_name"] for m in members]
+        assert "meowth" in names and "meowth-alolan" in names
+
 
 # ---------------------------------------------------------------------------
 # _is_acceptable
@@ -287,26 +371,6 @@ class TestIsAcceptable:
     def test_true_with_no_weaknesses(self):
         assert _is_acceptable(_valid_report(weaknesses={})) is True
 
-
-# ---------------------------------------------------------------------------
-# _score_team
-# ---------------------------------------------------------------------------
-
-class TestScoreTeam:
-    def test_returns_1_when_no_weaknesses(self):
-        assert _score_team(_valid_report(weaknesses={})) == pytest.approx(1.0)
-
-    def test_applies_weakness_penalty(self):
-        report = _valid_report(weaknesses={"ice": 2})
-        assert _score_team(report) == pytest.approx(1.0 - 2 * 0.05)
-
-    def test_penalty_uses_max_weakness_count(self):
-        report = _valid_report(weaknesses={"ice": 1, "fire": 2})
-        assert _score_team(report) == pytest.approx(1.0 - 2 * 0.05)
-
-    def test_single_weakness_count_1(self):
-        report = _valid_report(weaknesses={"fire": 1})
-        assert _score_team(report) == pytest.approx(0.95)
 
 
 # ---------------------------------------------------------------------------
@@ -369,23 +433,30 @@ class TestGenerateTeams:
         assert result["generated"] == MAX_RESULTS
 
     def test_results_sorted_by_score_descending(self):
+        # defensive score varies with weakness count → drives overall ordering
         reports = [
-            _valid_report(weaknesses={"fire": 2}),   # score 0.90
-            _valid_report(weaknesses={}),              # score 1.00
-            _valid_report(weaknesses={"fire": 1}),   # score 0.95
-            _valid_report(weaknesses={"ice": 2}),     # score 0.90
-            _valid_report(weaknesses={"ice": 1}),     # score 0.95
+            _valid_report(weaknesses={"fire": 2}),
+            _valid_report(weaknesses={}),
+            _valid_report(weaknesses={"fire": 1}),
+            _valid_report(weaknesses={"ice": 2}),
+            _valid_report(weaknesses={"ice": 1}),
         ]
         result = self._run(reports)
         scores = [t["score"] for t in result["teams"]]
         assert scores == sorted(scores, reverse=True)
 
-    def test_team_dict_has_score_members_analysis(self):
+    def test_team_dict_has_score_members_analysis_breakdown(self):
         result = self._run([_valid_report()])
         team = result["teams"][0]
         assert "score" in team
         assert "members" in team
         assert "analysis" in team
+        assert "breakdown" in team
+
+    def test_score_is_in_0_to_10_range(self):
+        result = self._run([_valid_report()])
+        score = result["teams"][0]["score"]
+        assert 0.0 <= score <= 10.0
 
     def test_raises_value_error_for_invalid_include(self):
         conn = MagicMock()

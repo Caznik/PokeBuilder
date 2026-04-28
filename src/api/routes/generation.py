@@ -11,6 +11,7 @@ from ..models.generation import (
     TeamResult,
 )
 from ..models.team import CoverageResult
+from ..models.scoring import ScoreBreakdown, ScoreComponent
 from ..services.team_generator import generate_teams
 from ..db import get_db_connection
 
@@ -47,7 +48,19 @@ def generate_team_endpoint(body: GenerateRequest = GenerateRequest()):
             resistances=a["resistances"],
             coverage=CoverageResult(**a["coverage"]),
         )
-        teams.append(TeamResult(score=t["score"], members=members, analysis=analysis))
+        bd = t["breakdown"]
+        breakdown = ScoreBreakdown(
+            coverage=ScoreComponent(**bd["coverage"]),
+            defensive=ScoreComponent(**bd["defensive"]),
+            role=ScoreComponent(**bd["role"]),
+            speed=ScoreComponent(**bd["speed"]),
+        )
+        teams.append(TeamResult(
+            score=t["score"],
+            breakdown=breakdown,
+            members=members,
+            analysis=analysis,
+        ))
 
     return GenerationResponse(
         teams=teams,

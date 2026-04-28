@@ -20,7 +20,14 @@ def _valid_result(n_teams=1, weakness_count=1):
     teams = []
     for i in range(n_teams):
         teams.append({
-            "score": round(1.0 - weakness_count * 0.05, 4),
+            "score": round(7.5 - weakness_count * 0.5, 2),
+            "breakdown": {
+                "coverage":  {"score": 0.11, "reason": "missing fairy"},
+                "defensive": {"score": round(1.0 - weakness_count * 0.2, 2),
+                              "reason": f"{weakness_count} Pokémon weak to fire"},
+                "role":      {"score": 1.00, "reason": "all role minimums met"},
+                "speed":     {"score": 0.50, "reason": "limited speed control (1 fast, 0 priority)"},
+            },
             "members": [
                 {"pokemon_name": "garchomp",   "set_id": 1, "set_name": "Choice Scarf"},
                 {"pokemon_name": "ferrothorn", "set_id": 2, "set_name": "Defensive"},
@@ -170,6 +177,19 @@ class TestGenerateEndpoint:
         with _mock_generate(_valid_result()):
             resp = client.post("/team/generate")
         assert isinstance(resp.json()["teams"][0]["score"], float)
+
+    def test_team_has_breakdown_with_four_components(self):
+        with _mock_generate(_valid_result()):
+            resp = client.post("/team/generate")
+        breakdown = resp.json()["teams"][0]["breakdown"]
+        assert set(breakdown.keys()) == {"coverage", "defensive", "role", "speed"}
+
+    def test_breakdown_components_have_score_and_reason(self):
+        with _mock_generate(_valid_result()):
+            resp = client.post("/team/generate")
+        for comp in resp.json()["teams"][0]["breakdown"].values():
+            assert "score" in comp
+            assert "reason" in comp
 
     def test_multiple_teams_returned(self):
         with _mock_generate(_valid_result(n_teams=3)):
