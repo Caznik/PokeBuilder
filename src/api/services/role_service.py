@@ -17,6 +17,12 @@ HP_THRESHOLD        = 300
 # Move-name sets for move-based role detection
 # ---------------------------------------------------------------------------
 
+PRIORITY_MOVES: frozenset[str] = frozenset({
+    "extreme-speed", "sucker-punch", "bullet-punch", "mach-punch",
+    "ice-shard", "aqua-jet", "vacuum-wave", "accelerock",
+    "jet-punch", "thunderclap", "quick-attack", "shadow-sneak",
+})
+
 HAZARD_SETTER_MOVES:  frozenset[str] = frozenset({
     "stealth-rock", "spikes", "toxic-spikes", "sticky-web",
 })
