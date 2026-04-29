@@ -157,6 +157,8 @@ def _sample_candidate(
             "pokemon_name": entry.pokemon_name,
             "set_id": entry.set_id,
             "set_name": entry.set_name,
+            "nature": build.nature,
+            "ability": build.ability,
         })
         builds.append(build)
         chosen_species.add(_base_species(entry.pokemon_name))

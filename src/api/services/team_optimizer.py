@@ -57,7 +57,11 @@ def _seed_population(
     rng: random.Random,
     size: int,
 ) -> list[Chromosome]:
-    """Seed the initial GA population with valid teams from the generator.
+    """Seed the initial GA population with structurally valid teams.
+
+    Uses a relaxed acceptance criterion (only requires team validity, not the
+    weakness threshold) so the GA starts from a larger, more diverse gene pool.
+    Duplicate chromosomes are excluded.
 
     Args:
         pool: Filtered pool of PoolEntry tuples.
@@ -66,9 +70,10 @@ def _seed_population(
         size: Target population size.
 
     Returns:
-        List of Chromosome (up to size). May be smaller if valid teams are scarce.
+        List of unique Chromosomes (up to size). May be smaller if valid teams are scarce.
     """
     population: list[Chromosome] = []
+    seen: set[frozenset] = set()
     max_attempts = size * MAX_SEED_ATTEMPTS_MULTIPLIER
     attempts = 0
     while len(population) < size and attempts < max_attempts:
@@ -77,8 +82,12 @@ def _seed_population(
         if len(builds) < 6:
             continue
         report = analyze_team(builds)
-        if _is_acceptable(report):
-            chromosome = [(m["pokemon_name"], m["set_id"]) for m in members]
+        if not report["valid"]:
+            continue
+        chromosome = [(m["pokemon_name"], m["set_id"]) for m in members]
+        key = _cache_key(chromosome)
+        if key not in seen:
+            seen.add(key)
             population.append(chromosome)
     return population
 
@@ -292,6 +301,20 @@ def optimize_team(
 
     children_per_gen = max(1, population_size // CHILDREN_PER_GENERATION_RATIO)
 
+    # Hall of fame: best unique chromosomes seen across all generations,
+    # keyed by frozenset → (score, chromosome). Tracks diverse top teams
+    # even when the final population has converged.
+    hof: dict[frozenset, tuple[float, Chromosome]] = {}
+
+    def _update_hof(chrom: Chromosome) -> None:
+        key = _cache_key(chrom)
+        score = _evaluate(chrom, conn, cache, eval_count)
+        if key not in hof or score > hof[key][0]:
+            hof[key] = (score, list(chrom))
+
+    for chrom in population:
+        _update_hof(chrom)
+
     for _ in range(generations):
         if not population:
             break
@@ -313,6 +336,7 @@ def optimize_team(
             else:
                 child = _repair(child, filtered_pool, rng)
             children.append(child)
+            _update_hof(child)
 
         population = sorted(
             population + children,
@@ -320,13 +344,30 @@ def optimize_team(
             reverse=True,
         )[:population_size]
 
-    best = population[:MAX_RESULTS_OPTIMIZER]
+        for chrom in population:
+            _update_hof(chrom)
+
+    # Pick top unique teams from the hall of fame, sorted by score descending
+    best = [
+        chrom for _, chrom in sorted(hof.values(), key=lambda x: x[0], reverse=True)
+    ][:MAX_RESULTS_OPTIMIZER]
+
+    pool_by_set = {(e.pokemon_name, e.set_id): e for e in filtered_pool}
     best_teams = []
     for chrom in best:
         builds = [load_build(conn, name, sid) for name, sid in chrom]
         report = analyze_team(builds)
         scoring = score_team(report, builds)
-        members = [{"pokemon_name": n, "set_id": s, "set_name": None} for n, s in chrom]
+        members = []
+        for (n, s), build in zip(chrom, builds):
+            entry = pool_by_set.get((n, s))
+            members.append({
+                "pokemon_name": n,
+                "set_id": s,
+                "set_name": entry.set_name if entry else None,
+                "nature": build.nature,
+                "ability": build.ability,
+            })
         best_teams.append({
             "score": scoring["score"],
             "breakdown": scoring["breakdown"],

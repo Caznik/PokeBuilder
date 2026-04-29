@@ -20,6 +20,8 @@ class GenerationMember(BaseModel):
     pokemon_name: str
     set_id: int
     set_name: str | None = None
+    nature: str | None = None
+    ability: str | None = None
 
 
 class TeamAnalysis(BaseModel):
