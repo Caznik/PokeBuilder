@@ -50,7 +50,8 @@ def score_team_endpoint(
         coverage=ScoreComponent(**bd["coverage"]),
         defensive=ScoreComponent(**bd["defensive"]),
         role=ScoreComponent(**bd["role"]),
-        speed=ScoreComponent(**bd["speed"]),
+        speed_control=ScoreComponent(**bd["speed_control"]),
+        lead_pair=ScoreComponent(**bd["lead_pair"]),
     )
     analysis = TeamAnalysisResponse(
         valid=report["valid"],
@@ -59,5 +60,6 @@ def score_team_endpoint(
         weaknesses=report["weaknesses"],
         resistances=report["resistances"],
         coverage=CoverageResult(**report["coverage"]),
+        speed_control_archetype=report.get("speed_control_archetype", "none"),
     )
     return ScoreResponse(score=scoring["score"], breakdown=breakdown, analysis=analysis)

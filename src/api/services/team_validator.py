@@ -1,41 +1,41 @@
 # src/api/services/team_validator.py
-"""Team validation against a configurable role rule set."""
+"""Team validation against VGC doubles role rule set."""
 
 from ..models.team import PokemonBuild
 from .role_service import detect_roles
 
 ALL_ROLES = (
-    "physical_sweeper", "special_sweeper", "tank",
-    "hazard_setter", "hazard_removal", "pivot", "support",
+    "physical_attacker", "special_attacker", "tank",
+    "tailwind_setter", "trick_room_setter",
+    "fake_out_user", "redirector", "spread_attacker",
+    "support",
+    "speed_control", "disruption",
 )
 
 TEAM_RULES: dict[str, int] = {
     "min_physical_attacker": 1,
     "min_special_attacker":  1,
-    "min_tank":              1,
-    "min_hazard_setter":     1,
-    "min_pivot":             1,
+    "min_speed_control":     1,
+    "min_disruption":        1,
 }
 
 _RULE_TO_ROLE: dict[str, str] = {
-    "min_physical_attacker": "physical_sweeper",
-    "min_special_attacker":  "special_sweeper",
-    "min_tank":              "tank",
-    "min_hazard_setter":     "hazard_setter",
-    "min_pivot":             "pivot",
+    "min_physical_attacker": "physical_attacker",
+    "min_special_attacker":  "special_attacker",
+    "min_speed_control":     "speed_control",
+    "min_disruption":        "disruption",
 }
 
 _RULE_LABEL: dict[str, str] = {
     "min_physical_attacker": "physical attacker",
     "min_special_attacker":  "special attacker",
-    "min_tank":              "tank",
-    "min_hazard_setter":     "hazard setter",
-    "min_pivot":             "pivot",
+    "min_speed_control":     "speed control (Tailwind or Trick Room setter)",
+    "min_disruption":        "disruption (Fake Out or redirector)",
 }
 
 
 def validate_team(builds: list[PokemonBuild]) -> dict:
-    """Validate a team against TEAM_RULES and return role counts.
+    """Validate a team against VGC doubles TEAM_RULES and return role counts.
 
     Args:
         builds: List of PokemonBuild (typically 6).

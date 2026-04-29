@@ -1,153 +1,172 @@
 # tests/test_team_validator.py
-"""Unit tests for team validator."""
+"""Unit tests for VGC doubles team validation."""
 
 import pytest
 from unittest.mock import patch
-from src.api.models.team import MoveDetail, PokemonBuild
-from src.api.services.team_validator import validate_team
-
-BASE = {"hp": 250, "attack": 200, "defense": 150,
-        "sp_attack": 150, "sp_defense": 150, "speed": 200}
+from src.api.services.team_validator import validate_team, TEAM_RULES, ALL_ROLES
+from src.api.models.team import PokemonBuild, MoveDetail
 
 
-def _build(roles):
-    """Create a fake build whose detect_roles will return the given list."""
-    return PokemonBuild("x", 1, ["normal"], None, None, None, BASE, [])
+def _build(roles_to_assign):
+    """Create a mock build that will detect the given roles."""
+    return PokemonBuild(
+        pokemon_name="test", set_id=1, types=["normal"],
+        nature="hardy", ability=None, item=None,
+        stats={"hp": 100, "attack": 100, "defense": 100,
+               "sp_attack": 100, "sp_defense": 100, "speed": 100},
+        moves=[],
+    )
 
 
-def _team_with_roles(role_lists: list[list[str]]) -> list[PokemonBuild]:
-    """Return a list of builds mocked so detect_roles returns the given roles."""
-    return [_build(r) for r in role_lists]
+def _team_with_roles(roles_per_build: list[list[str]]) -> list:
+    """Build a list of PokemonBuild mocks, patching detect_roles per build."""
+    return [_build(r) for r in roles_per_build]
 
 
-def _validate(role_lists):
-    builds = _team_with_roles(role_lists)
-    side_effects = role_lists[:]
-    with patch("src.api.services.team_validator.detect_roles",
-               side_effect=side_effects):
-        return validate_team(builds)
+class TestTeamRulesConstants:
+    def test_team_rules_requires_physical_attacker(self):
+        assert "min_physical_attacker" in TEAM_RULES
+
+    def test_team_rules_requires_special_attacker(self):
+        assert "min_special_attacker" in TEAM_RULES
+
+    def test_team_rules_requires_speed_control(self):
+        assert "min_speed_control" in TEAM_RULES
+
+    def test_team_rules_requires_disruption(self):
+        assert "min_disruption" in TEAM_RULES
+
+    def test_team_rules_does_not_require_hazard_setter(self):
+        assert "min_hazard_setter" not in TEAM_RULES
+
+    def test_team_rules_does_not_require_pivot(self):
+        assert "min_pivot" not in TEAM_RULES
+
+    def test_all_roles_includes_tailwind_setter(self):
+        assert "tailwind_setter" in ALL_ROLES
+
+    def test_all_roles_includes_trick_room_setter(self):
+        assert "trick_room_setter" in ALL_ROLES
+
+    def test_all_roles_includes_fake_out_user(self):
+        assert "fake_out_user" in ALL_ROLES
+
+    def test_all_roles_includes_speed_control(self):
+        assert "speed_control" in ALL_ROLES
+
+    def test_all_roles_includes_disruption(self):
+        assert "disruption" in ALL_ROLES
+
+    def test_all_roles_does_not_include_hazard_setter(self):
+        assert "hazard_setter" not in ALL_ROLES
+
+    def test_all_roles_does_not_include_pivot(self):
+        assert "pivot" not in ALL_ROLES
 
 
-class TestValidTeam:
-
-    def test_valid_team_returns_valid_true(self):
-        result = _validate([
-            ["physical_sweeper"],
-            ["special_sweeper"],
+class TestValidateTeam:
+    def test_valid_vgc_team_passes(self):
+        role_sets = [
+            ["physical_attacker"],
+            ["special_attacker"],
+            ["tailwind_setter", "speed_control"],
+            ["fake_out_user", "disruption"],
             ["tank"],
-            ["hazard_setter"],
-            ["pivot"],
-            ["support"],
-        ])
+            ["spread_attacker"],
+        ]
+        builds = _team_with_roles(role_sets)
+        with patch("src.api.services.team_validator.detect_roles",
+                   side_effect=role_sets):
+            result = validate_team(builds)
         assert result["valid"] is True
         assert result["issues"] == []
 
-    def test_one_pokemon_can_cover_multiple_rules(self):
-        result = _validate([
-            ["physical_sweeper", "hazard_setter"],
-            ["special_sweeper", "pivot"],
+    def test_missing_speed_control_is_invalid(self):
+        role_sets = [
+            ["physical_attacker"],
+            ["special_attacker"],
+            ["fake_out_user", "disruption"],
             ["tank"],
+            ["spread_attacker"],
             ["support"],
-            ["physical_sweeper"],
-            ["special_sweeper"],
-        ])
+        ]
+        builds = _team_with_roles(role_sets)
+        with patch("src.api.services.team_validator.detect_roles",
+                   side_effect=role_sets):
+            result = validate_team(builds)
+        assert result["valid"] is False
+        assert any("speed control" in i.lower() for i in result["issues"])
+
+    def test_missing_disruption_is_invalid(self):
+        role_sets = [
+            ["physical_attacker"],
+            ["special_attacker"],
+            ["tailwind_setter", "speed_control"],
+            ["tank"],
+            ["spread_attacker"],
+            ["support"],
+        ]
+        builds = _team_with_roles(role_sets)
+        with patch("src.api.services.team_validator.detect_roles",
+                   side_effect=role_sets):
+            result = validate_team(builds)
+        assert result["valid"] is False
+        assert any("disruption" in i.lower() for i in result["issues"])
+
+    def test_roles_dict_contains_vgc_keys(self):
+        role_sets = [
+            ["physical_attacker"],
+            ["special_attacker"],
+            ["tailwind_setter", "speed_control"],
+            ["fake_out_user", "disruption"],
+            ["tank"],
+            ["spread_attacker"],
+        ]
+        builds = _team_with_roles(role_sets)
+        with patch("src.api.services.team_validator.detect_roles",
+                   side_effect=role_sets):
+            result = validate_team(builds)
+        assert "physical_attacker" in result["roles"]
+        assert "tailwind_setter" in result["roles"]
+        assert "speed_control" in result["roles"]
+        assert "disruption" in result["roles"]
+
+    def test_roles_dict_does_not_contain_singles_keys(self):
+        role_sets = [["physical_attacker"]] * 6
+        builds = _team_with_roles(role_sets)
+        with patch("src.api.services.team_validator.detect_roles",
+                   side_effect=role_sets):
+            result = validate_team(builds)
+        assert "hazard_setter" not in result["roles"]
+        assert "pivot" not in result["roles"]
+        assert "physical_sweeper" not in result["roles"]
+
+    def test_trick_room_setter_satisfies_speed_control_rule(self):
+        role_sets = [
+            ["physical_attacker"],
+            ["special_attacker"],
+            ["trick_room_setter", "speed_control"],
+            ["fake_out_user", "disruption"],
+            ["tank"],
+            ["spread_attacker"],
+        ]
+        builds = _team_with_roles(role_sets)
+        with patch("src.api.services.team_validator.detect_roles",
+                   side_effect=role_sets):
+            result = validate_team(builds)
         assert result["valid"] is True
 
-
-class TestInvalidTeam:
-
-    def test_missing_physical_attacker(self):
-        result = _validate([
-            ["special_sweeper"],
-            ["special_sweeper"],
+    def test_redirector_satisfies_disruption_rule(self):
+        role_sets = [
+            ["physical_attacker"],
+            ["special_attacker"],
+            ["tailwind_setter", "speed_control"],
+            ["redirector", "disruption"],
             ["tank"],
-            ["hazard_setter"],
-            ["pivot"],
-            ["support"],
-        ])
-        assert result["valid"] is False
-        assert any("physical" in i.lower() for i in result["issues"])
-
-    def test_missing_special_attacker(self):
-        result = _validate([
-            ["physical_sweeper"],
-            ["physical_sweeper"],
-            ["tank"],
-            ["hazard_setter"],
-            ["pivot"],
-            ["support"],
-        ])
-        assert result["valid"] is False
-        assert any("special" in i.lower() for i in result["issues"])
-
-    def test_missing_tank(self):
-        result = _validate([
-            ["physical_sweeper"],
-            ["special_sweeper"],
-            ["physical_sweeper"],
-            ["hazard_setter"],
-            ["pivot"],
-            ["support"],
-        ])
-        assert result["valid"] is False
-        assert any("tank" in i.lower() for i in result["issues"])
-
-    def test_missing_hazard_setter(self):
-        result = _validate([
-            ["physical_sweeper"],
-            ["special_sweeper"],
-            ["tank"],
-            ["pivot"],
-            ["pivot"],
-            ["support"],
-        ])
-        assert result["valid"] is False
-        assert any("hazard setter" in i.lower() for i in result["issues"])
-
-    def test_missing_pivot(self):
-        result = _validate([
-            ["physical_sweeper"],
-            ["special_sweeper"],
-            ["tank"],
-            ["hazard_setter"],
-            ["support"],
-            ["support"],
-        ])
-        assert result["valid"] is False
-        assert any("pivot" in i.lower() for i in result["issues"])
-
-    def test_multiple_issues_reported(self):
-        result = _validate([
-            ["support"],
-            ["support"],
-            ["support"],
-            ["support"],
-            ["support"],
-            ["support"],
-        ])
-        assert result["valid"] is False
-        assert len(result["issues"]) >= 3
-
-
-class TestRolesAggregated:
-
-    def test_roles_counts_are_correct(self):
-        result = _validate([
-            ["physical_sweeper", "pivot"],
-            ["special_sweeper"],
-            ["tank", "hazard_setter"],
-            ["physical_sweeper"],
-            ["pivot"],
-            ["support"],
-        ])
-        assert result["roles"]["physical_sweeper"] == 2
-        assert result["roles"]["special_sweeper"] == 1
-        assert result["roles"]["pivot"] == 2
-        assert result["roles"]["hazard_setter"] == 1
-        assert result["roles"]["tank"] == 1
-
-    def test_all_role_keys_present_even_if_zero(self):
-        result = _validate([[], [], [], [], [], []])
-        for key in ("physical_sweeper", "special_sweeper", "tank",
-                    "hazard_setter", "hazard_removal", "pivot", "support"):
-            assert key in result["roles"]
+            ["spread_attacker"],
+        ]
+        builds = _team_with_roles(role_sets)
+        with patch("src.api.services.team_validator.detect_roles",
+                   side_effect=role_sets):
+            result = validate_team(builds)
+        assert result["valid"] is True

@@ -65,3 +65,4 @@ class TeamAnalysisResponse(BaseModel):
     weaknesses: dict[str, int]
     resistances: dict[str, int]
     coverage: CoverageResult
+    speed_control_archetype: str = "none"
