@@ -10,12 +10,15 @@ from ..models.team import PokemonBuild
 from .team_loader import load_build
 from .team_analysis import analyze_team
 from .role_service import detect_roles
-from .team_scorer import score_team
+from .team_scorer import score_team, compute_lead_pair_score
 
 MAX_RESULTS = 5
 MAX_ITERATIONS = 100
 WEAKNESS_THRESHOLD = 3
 HEURISTIC_RETRY_BUDGET = 10
+MAX_PHYSICAL_ATTACKERS = 2
+MAX_SPECIAL_ATTACKERS = 2
+MAX_TR_SETTERS = 1
 
 # Matches mega, gmax, and primal form suffixes — these are battle-only
 # transformations of the base species and must not share a team slot.
@@ -144,7 +147,7 @@ def _sample_candidate(
     """
     chosen_species: set[str] = set()   # tracks _base_species() of committed members
     type_counts: dict[str, int] = {}
-    sweeper_counts: dict[str, int] = {"physical_sweeper": 0, "special_sweeper": 0}
+    role_limits: dict[str, int] = {"physical_attacker": 0, "special_attacker": 0, "trick_room_setter": 0}
     members: list[dict] = []
     builds: list[PokemonBuild] = []
 
@@ -160,8 +163,8 @@ def _sample_candidate(
         if entry.primary_type:
             type_counts[entry.primary_type] = type_counts.get(entry.primary_type, 0) + 1
         for role in roles:
-            if role in sweeper_counts:
-                sweeper_counts[role] += 1
+            if role in role_limits:
+                role_limits[role] += 1
 
     # Lock in required include Pokémon first (deduplicate to avoid Rule 1 violation)
     seen_include: set[str] = set()
@@ -215,8 +218,9 @@ def _sample_candidate(
                 continue
             roles = detect_roles(build)
             violates = (
-                ("physical_sweeper" in roles and sweeper_counts["physical_sweeper"] >= 2)
-                or ("special_sweeper" in roles and sweeper_counts["special_sweeper"] >= 2)
+                ("physical_attacker" in roles and role_limits["physical_attacker"] >= MAX_PHYSICAL_ATTACKERS)
+                or ("special_attacker" in roles and role_limits["special_attacker"] >= MAX_SPECIAL_ATTACKERS)
+                or ("trick_room_setter" in roles and role_limits["trick_room_setter"] >= MAX_TR_SETTERS)
             )
             if not violates:
                 chosen_entry = entry
@@ -308,6 +312,9 @@ def generate_teams(
             continue
         report = analyze_team(builds)
         if _is_acceptable(report):
+            lead = compute_lead_pair_score(builds)
+            if lead["score"] == 0.0:
+                continue
             scoring = score_team(report, builds)
             results.append({
                 "score": scoring["score"],

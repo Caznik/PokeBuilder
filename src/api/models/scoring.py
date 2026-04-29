@@ -15,7 +15,8 @@ class ScoreBreakdown(BaseModel):
     coverage: ScoreComponent
     defensive: ScoreComponent
     role: ScoreComponent
-    speed: ScoreComponent
+    speed_control: ScoreComponent
+    lead_pair: ScoreComponent
 
 
 class ScoreResponse(BaseModel):

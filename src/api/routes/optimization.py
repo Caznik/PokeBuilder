@@ -46,13 +46,15 @@ def optimize_team_endpoint(body: OptimizeRequest = OptimizeRequest()):
             weaknesses=a["weaknesses"],
             resistances=a["resistances"],
             coverage=CoverageResult(**a["coverage"]),
+            speed_control_archetype=a.get("speed_control_archetype", "none"),
         )
         bd = t["breakdown"]
         breakdown = ScoreBreakdown(
             coverage=ScoreComponent(**bd["coverage"]),
             defensive=ScoreComponent(**bd["defensive"]),
             role=ScoreComponent(**bd["role"]),
-            speed=ScoreComponent(**bd["speed"]),
+            speed_control=ScoreComponent(**bd["speed_control"]),
+            lead_pair=ScoreComponent(**bd["lead_pair"]),
         )
         teams.append(TeamResult(
             score=t["score"],

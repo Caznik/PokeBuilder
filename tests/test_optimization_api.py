@@ -12,10 +12,11 @@ from src.api.main import app
 client = TestClient(app)
 
 _BREAKDOWN = {
-    "coverage":  {"score": 0.94, "reason": "missing fairy"},
-    "defensive": {"score": 1.00, "reason": "no shared weaknesses"},
-    "role":      {"score": 1.00, "reason": "all role minimums met"},
-    "speed":     {"score": 1.00, "reason": "3 fast Pokémon, 1 priority user(s)"},
+    "coverage":      {"score": 0.94, "reason": "missing fairy"},
+    "defensive":     {"score": 1.00, "reason": "no shared weaknesses"},
+    "role":          {"score": 1.00, "reason": "all role minimums met"},
+    "speed_control": {"score": 1.00, "reason": "Tailwind team, 5 fast members"},
+    "lead_pair":     {"score": 1.00, "reason": "3 viable lead pairs"},
 }
 
 _ANALYSIS = {
@@ -111,7 +112,7 @@ class TestOptimizeEndpoint:
         with _mock_optimize():
             resp = client.post("/team/optimize", json={})
         breakdown = resp.json()["best_teams"][0]["breakdown"]
-        assert set(breakdown.keys()) == {"coverage", "defensive", "role", "speed"}
+        assert set(breakdown.keys()) == {"coverage", "defensive", "role", "speed_control", "lead_pair"}
 
     def test_each_component_has_score_and_reason(self):
         with _mock_optimize():

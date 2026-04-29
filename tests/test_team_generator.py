@@ -393,6 +393,10 @@ class TestGenerateTeams:
                 "src.api.services.team_generator.analyze_team",
                 side_effect=cycle(reports),
             ),
+            patch(
+                "src.api.services.team_generator.compute_lead_pair_score",
+                return_value={"score": 1.0, "reason": "viable lead pair"},
+            ),
         ):
             return generate_teams(conn, constraints=constraints, rng=rng)
 
@@ -497,6 +501,142 @@ class TestGenerateTeams:
                 "src.api.services.team_generator.analyze_team",
                 return_value=_valid_report(),
             ),
+            patch(
+                "src.api.services.team_generator.compute_lead_pair_score",
+                return_value={"score": 1.0, "reason": "viable lead pair"},
+            ),
         ):
             result = generate_teams(conn, constraints=c, rng=random.Random(0))
+        assert result["valid_found"] > 0
+
+
+class TestVGCHeuristics:
+    """Tests for VGC-specific generation heuristics."""
+
+    def _pool(self, n=24):
+        return [PoolEntry(f"poke{i}", i, None, "fire") for i in range(1, n + 1)]
+
+    def _members(self, n=6):
+        return [{"pokemon_name": f"poke{i}", "set_id": i, "set_name": None}
+                for i in range(1, n + 1)]
+
+    def test_max_tr_setters_constant_is_one(self):
+        from src.api.services.team_generator import MAX_TR_SETTERS
+        assert MAX_TR_SETTERS == 1
+
+    def test_sample_candidate_uses_physical_attacker_not_sweeper(self):
+        """The internal role_limits dict must use physical_attacker, not physical_sweeper."""
+        import random
+        from unittest.mock import patch, MagicMock
+        from src.api.services.team_generator import _sample_candidate
+        pool = self._pool()
+        rng = random.Random(42)
+        mock_conn = MagicMock()
+        mock_build = MagicMock()
+        mock_build.stats = {"speed": 200, "attack": 200, "sp_attack": 200,
+                            "hp": 200, "defense": 150, "sp_defense": 150}
+        mock_build.moves = []
+
+        with (
+            patch("src.api.services.team_generator.load_build", return_value=mock_build),
+            patch("src.api.services.team_generator.detect_roles", return_value=["physical_attacker"]),
+        ):
+            members, builds = _sample_candidate(pool, [], mock_conn, rng)
+        # Should not raise — if sweeper_counts used old name, KeyError would occur
+        assert len(builds) > 0
+
+    def test_generate_teams_rejects_team_with_no_viable_lead_pair(self):
+        """Teams that score 0.0 on lead_pair must be rejected."""
+        import random
+        from unittest.mock import patch, MagicMock
+        from src.api.services.team_generator import generate_teams
+        from src.api.models.generation import GenerationConstraints
+
+        pool = self._pool()
+        rng = random.Random(42)
+        mock_conn = MagicMock()
+
+        valid_report = {
+            "valid": True, "issues": [],
+            "roles": {
+                "physical_attacker": 2, "special_attacker": 1, "tank": 1,
+                "tailwind_setter": 1, "trick_room_setter": 0,
+                "fake_out_user": 0, "redirector": 0, "spread_attacker": 1,
+                "support": 0, "speed_control": 1, "disruption": 0,
+            },
+            "weaknesses": {}, "resistances": {},
+            "coverage": {"covered_types": [], "missing_types": []},
+            "speed_control_archetype": "tailwind",
+        }
+        no_lead_pair = {"score": 0.0, "reason": "no viable lead pair"}
+        scoring = {
+            "score": 5.0,
+            "breakdown": {
+                "coverage": {"score": 0.5, "reason": "ok"},
+                "defensive": {"score": 1.0, "reason": "ok"},
+                "role": {"score": 0.5, "reason": "ok"},
+                "speed_control": {"score": 1.0, "reason": "ok"},
+                "lead_pair": {"score": 0.0, "reason": "no viable lead pair"},
+            },
+        }
+
+        with (
+            patch("src.api.services.team_generator._build_pool", return_value=pool),
+            patch("src.api.services.team_generator._validate_constraints"),
+            patch("src.api.services.team_generator._apply_constraints", return_value=pool),
+            patch("src.api.services.team_generator._sample_candidate",
+                  return_value=(self._members(), [MagicMock()] * 6)),
+            patch("src.api.services.team_generator.analyze_team", return_value=valid_report),
+            patch("src.api.services.team_generator.compute_lead_pair_score",
+                  return_value=no_lead_pair),
+            patch("src.api.services.team_generator.score_team", return_value=scoring),
+        ):
+            result = generate_teams(mock_conn, rng=rng)
+        assert result["valid_found"] == 0
+
+    def test_generate_teams_accepts_team_with_viable_lead_pair(self):
+        import random
+        from unittest.mock import patch, MagicMock
+        from src.api.services.team_generator import generate_teams
+
+        pool = self._pool()
+        rng = random.Random(42)
+        mock_conn = MagicMock()
+
+        valid_report = {
+            "valid": True, "issues": [],
+            "roles": {
+                "physical_attacker": 2, "special_attacker": 1, "tank": 1,
+                "tailwind_setter": 1, "trick_room_setter": 0,
+                "fake_out_user": 1, "redirector": 0, "spread_attacker": 1,
+                "support": 0, "speed_control": 1, "disruption": 1,
+            },
+            "weaknesses": {}, "resistances": {},
+            "coverage": {"covered_types": [], "missing_types": []},
+            "speed_control_archetype": "tailwind",
+        }
+        good_lead_pair = {"score": 1.0, "reason": "3 viable lead pairs"}
+        scoring = {
+            "score": 8.0,
+            "breakdown": {
+                "coverage": {"score": 0.8, "reason": "ok"},
+                "defensive": {"score": 1.0, "reason": "ok"},
+                "role": {"score": 1.0, "reason": "ok"},
+                "speed_control": {"score": 1.0, "reason": "ok"},
+                "lead_pair": {"score": 1.0, "reason": "3 viable lead pairs"},
+            },
+        }
+
+        with (
+            patch("src.api.services.team_generator._build_pool", return_value=pool),
+            patch("src.api.services.team_generator._validate_constraints"),
+            patch("src.api.services.team_generator._apply_constraints", return_value=pool),
+            patch("src.api.services.team_generator._sample_candidate",
+                  return_value=(self._members(), [MagicMock()] * 6)),
+            patch("src.api.services.team_generator.analyze_team", return_value=valid_report),
+            patch("src.api.services.team_generator.compute_lead_pair_score",
+                  return_value=good_lead_pair),
+            patch("src.api.services.team_generator.score_team", return_value=scoring),
+        ):
+            result = generate_teams(mock_conn, rng=rng)
         assert result["valid_found"] > 0

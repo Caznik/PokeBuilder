@@ -38,10 +38,11 @@ _ANALYSIS = {
 _SCORE_RESULT = {
     "score": 7.5,
     "breakdown": {
-        "coverage":  {"score": 0.17, "reason": "missing fairy"},
-        "defensive": {"score": 0.80, "reason": "1 Pokémon weak to fire"},
-        "role":      {"score": 1.00, "reason": "all role minimums met"},
-        "speed":     {"score": 1.00, "reason": "2 fast Pokémon, 0 priority user(s)"},
+        "coverage":      {"score": 0.17, "reason": "missing fairy"},
+        "defensive":     {"score": 0.80, "reason": "1 Pokémon weak to fire"},
+        "role":          {"score": 1.00, "reason": "all role minimums met"},
+        "speed_control": {"score": 1.00, "reason": "2 fast Pokémon, 0 priority user(s)"},
+        "lead_pair":     {"score": 1.00, "reason": "3 viable lead pairs"},
     },
 }
 
@@ -99,7 +100,7 @@ class TestScoreEndpoint:
         with _mock_score():
             resp = client.post("/team/score", json=_TEAM_6)
         breakdown = resp.json()["breakdown"]
-        assert set(breakdown.keys()) == {"coverage", "defensive", "role", "speed"}
+        assert set(breakdown.keys()) == {"coverage", "defensive", "role", "speed_control", "lead_pair"}
 
     def test_each_component_has_score_and_reason(self):
         with _mock_score():

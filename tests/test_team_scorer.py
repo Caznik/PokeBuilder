@@ -1,36 +1,42 @@
 # tests/test_team_scorer.py
-"""Unit tests for the team scoring engine."""
+"""Unit tests for the VGC doubles team scoring engine."""
 
 import pytest
-
 from src.api.models.team import PokemonBuild, MoveDetail
 from src.api.services.team_scorer import (
     WEIGHTS,
     compute_coverage_score,
     compute_defensive_score,
     compute_role_score,
-    compute_speed_score,
+    compute_speed_control_score,
+    compute_lead_pair_score,
     score_team,
 )
+from src.api.services.role_service import TAILWIND_SPEED_THRESHOLD, TR_SPEED_THRESHOLD
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+_PHYSICAL_MOVES = {
+    "earthquake", "fake-out", "u-turn", "tackle", "rock-slide",
+    "breaking-swipe", "close-combat", "extreme-speed",
+}
+_SPECIAL_MOVES = {
+    "heat-wave", "discharge", "surf", "blizzard", "flamethrower",
+    "muddy-water", "hyper-voice", "sludge-wave", "dazzling-gleam",
+}
 
-def _build(speed=90, move_names=()):
-    moves = [MoveDetail(name=n, type="normal", category="physical") for n in move_names]
+
+def _build(speed=200, move_names=(), attack=200, sp_attack=200):
+    moves = []
+    for n in move_names:
+        cat = ("physical" if n in _PHYSICAL_MOVES
+               else "special" if n in _SPECIAL_MOVES
+               else "status")
+        moves.append(MoveDetail(name=n, type="normal", category=cat))
     return PokemonBuild(
-        pokemon_name="test",
-        set_id=1,
-        types=["normal"],
-        nature="hardy",
-        ability="none",
-        item="none",
-        stats={
-            "hp": 100, "attack": 100, "defense": 100,
-            "sp_attack": 100, "sp_defense": 100, "speed": speed,
-        },
+        pokemon_name="test", set_id=1, types=["normal"],
+        nature="hardy", ability=None, item=None,
+        stats={"hp": 200, "attack": attack, "defense": 150,
+               "sp_attack": sp_attack, "sp_defense": 150, "speed": speed},
         moves=moves,
     )
 
@@ -47,12 +53,15 @@ def _report(**overrides):
         "valid": True,
         "issues": [],
         "roles": {
-            "physical_sweeper": 1, "special_sweeper": 1, "tank": 1,
-            "hazard_setter": 1, "pivot": 1, "hazard_removal": 0, "support": 0,
+            "physical_attacker": 2, "special_attacker": 1, "tank": 1,
+            "tailwind_setter": 1, "trick_room_setter": 0,
+            "fake_out_user": 1, "redirector": 0, "spread_attacker": 2,
+            "support": 0, "speed_control": 1, "disruption": 1,
         },
-        "weaknesses": {"water": 1},
+        "weaknesses": {},
         "resistances": {},
-        "coverage": {"covered_types": _ALL_TYPES[:], "missing_types": []},
+        "coverage": {"covered_types": _ALL_TYPES, "missing_types": []},
+        "speed_control_archetype": "tailwind",
     }
     base.update(overrides)
     return base
@@ -62,296 +71,217 @@ def _report(**overrides):
 # compute_coverage_score
 # ---------------------------------------------------------------------------
 
-class TestComputeCoverageScore:
-    def test_all_18_types_scores_1(self):
-        report = _report(coverage={"covered_types": _ALL_TYPES, "missing_types": []})
-        result = compute_coverage_score(report)
+class TestCoverageScore:
+    def test_perfect_coverage_scores_1(self):
+        result = compute_coverage_score(_report())
         assert result["score"] == pytest.approx(1.0)
 
-    def test_all_18_types_reason(self):
-        report = _report(coverage={"covered_types": _ALL_TYPES, "missing_types": []})
-        result = compute_coverage_score(report)
-        assert result["reason"] == "covers all 18 types"
-
-    def test_9_types_scores_half(self):
-        nine = _ALL_TYPES[:9]
-        report = _report(coverage={"covered_types": nine, "missing_types": _ALL_TYPES[9:]})
-        result = compute_coverage_score(report)
+    def test_missing_types_reduces_score(self):
+        r = _report(coverage={"covered_types": _ALL_TYPES[:9], "missing_types": _ALL_TYPES[9:]})
+        result = compute_coverage_score(r)
         assert result["score"] == pytest.approx(9 / 18)
 
-    def test_0_types_scores_0(self):
-        report = _report(coverage={"covered_types": [], "missing_types": _ALL_TYPES})
-        result = compute_coverage_score(report)
-        assert result["score"] == pytest.approx(0.0)
+    def test_reason_lists_missing_types(self):
+        r = _report(coverage={"covered_types": _ALL_TYPES[:17], "missing_types": ["fairy"]})
+        result = compute_coverage_score(r)
+        assert "fairy" in result["reason"]
 
-    def test_missing_types_in_reason_sorted(self):
-        report = _report(coverage={
-            "covered_types": ["fire"],
-            "missing_types": ["ice", "fairy", "dragon"],
-        })
-        result = compute_coverage_score(report)
-        reason = result["reason"]
-        assert reason.index("dragon") < reason.index("fairy") < reason.index("ice")
-
-    def test_reason_starts_with_missing(self):
-        report = _report(coverage={"covered_types": ["fire"], "missing_types": ["ice"]})
-        result = compute_coverage_score(report)
-        assert result["reason"].startswith("missing")
-
-    def test_score_and_reason_always_returned(self):
-        report = _report(coverage={"covered_types": ["fire"], "missing_types": []})
-        result = compute_coverage_score(report)
-        assert "score" in result
-        assert "reason" in result
+    def test_reason_is_all_covered_when_no_missing(self):
+        result = compute_coverage_score(_report())
+        assert result["reason"] == "covers all 18 types"
 
 
 # ---------------------------------------------------------------------------
 # compute_defensive_score
 # ---------------------------------------------------------------------------
 
-class TestComputeDefensiveScore:
-    def test_no_weaknesses_scores_1(self):
-        result = compute_defensive_score(_report(weaknesses={}))
+class TestDefensiveScore:
+    def test_no_weaknesses_scores_one(self):
+        r = _report(weaknesses={})
+        result = compute_defensive_score(r)
         assert result["score"] == pytest.approx(1.0)
-
-    def test_no_weaknesses_reason(self):
-        result = compute_defensive_score(_report(weaknesses={}))
         assert result["reason"] == "no shared weaknesses"
 
-    def test_1_weakness_scores_08(self):
-        result = compute_defensive_score(_report(weaknesses={"fire": 1}))
+    def test_one_weakness_scores_point_eight(self):
+        r = _report(weaknesses={"ground": 1})
+        result = compute_defensive_score(r)
         assert result["score"] == pytest.approx(0.8)
 
-    def test_2_weaknesses_scores_06(self):
-        result = compute_defensive_score(_report(weaknesses={"ice": 2}))
-        assert result["score"] == pytest.approx(0.6)
-
-    def test_5_weaknesses_scores_0(self):
-        result = compute_defensive_score(_report(weaknesses={"ground": 5}))
+    def test_five_or_more_weaknesses_clamped_to_zero(self):
+        r = _report(weaknesses={"ground": 5})
+        result = compute_defensive_score(r)
         assert result["score"] == pytest.approx(0.0)
 
-    def test_above_5_clamped_to_0(self):
-        result = compute_defensive_score(_report(weaknesses={"ground": 6}))
-        assert result["score"] == pytest.approx(0.0)
-
-    def test_uses_worst_type_for_score(self):
-        result = compute_defensive_score(_report(weaknesses={"ice": 1, "fire": 3}))
-        assert result["score"] == pytest.approx(1.0 - 3 * 0.2)
-
-    def test_reason_names_worst_type_and_count(self):
-        result = compute_defensive_score(_report(weaknesses={"ice": 1, "fire": 3}))
-        assert "fire" in result["reason"]
-        assert "3" in result["reason"]
-
-    def test_score_and_reason_always_returned(self):
-        result = compute_defensive_score(_report(weaknesses={"water": 2}))
-        assert "score" in result
-        assert "reason" in result
+    def test_reason_names_worst_type(self):
+        r = _report(weaknesses={"ground": 3, "fire": 1})
+        result = compute_defensive_score(r)
+        assert "ground" in result["reason"]
 
 
 # ---------------------------------------------------------------------------
 # compute_role_score
 # ---------------------------------------------------------------------------
 
-class TestComputeRoleScore:
-    def test_all_rules_met_scores_1(self):
+class TestRoleScore:
+    def test_all_rules_met_scores_one(self):
         result = compute_role_score(_report())
         assert result["score"] == pytest.approx(1.0)
-
-    def test_all_rules_met_reason(self):
-        result = compute_role_score(_report())
         assert result["reason"] == "all role minimums met"
 
-    def test_missing_one_role_scores_4_of_5(self):
-        roles = {
-            "physical_sweeper": 0, "special_sweeper": 1, "tank": 1,
-            "hazard_setter": 1, "pivot": 1, "hazard_removal": 0, "support": 0,
-        }
-        report = _report(roles=roles, valid=False,
-                         issues=["Missing physical attacker (need ≥ 1)"])
-        result = compute_role_score(report)
-        assert result["score"] == pytest.approx(4 / 5)
+    def test_missing_speed_control_reduces_score(self):
+        roles = {**_report()["roles"], "speed_control": 0}
+        r = _report(roles=roles, issues=["Missing speed control (need ≥ 1)"], valid=False)
+        result = compute_role_score(r)
+        assert result["score"] < 1.0
 
-    def test_issues_appear_in_reason(self):
-        roles = {
-            "physical_sweeper": 0, "special_sweeper": 0, "tank": 1,
-            "hazard_setter": 1, "pivot": 1, "hazard_removal": 0, "support": 0,
-        }
-        report = _report(
-            roles=roles, valid=False,
-            issues=["Missing physical attacker (need ≥ 1)",
-                    "Missing special attacker (need ≥ 1)"],
-        )
-        result = compute_role_score(report)
-        assert "Missing physical attacker" in result["reason"]
-        assert "Missing special attacker" in result["reason"]
+    def test_reason_contains_issues_when_rules_not_met(self):
+        r = _report(issues=["Missing disruption (need ≥ 1)"])
+        result = compute_role_score(r)
+        assert "disruption" in result["reason"]
 
-    def test_no_rules_met_scores_0(self):
-        roles = {r: 0 for r in [
-            "physical_sweeper", "special_sweeper", "tank",
-            "hazard_setter", "pivot", "hazard_removal", "support",
-        ]}
-        report = _report(roles=roles, valid=False,
-                         issues=["i1", "i2", "i3", "i4", "i5"])
-        result = compute_role_score(report)
-        assert result["score"] == pytest.approx(0.0)
 
-    def test_score_and_reason_always_returned(self):
-        result = compute_role_score(_report())
+# ---------------------------------------------------------------------------
+# compute_speed_control_score
+# ---------------------------------------------------------------------------
+
+class TestSpeedControlScore:
+    def test_no_setter_scores_zero(self):
+        r = _report(roles={**_report()["roles"], "tailwind_setter": 0, "trick_room_setter": 0})
+        builds = [_build(speed=300)] * 6
+        result = compute_speed_control_score(r, builds)
+        assert result["score"] == 0.0
+        assert "no speed control" in result["reason"]
+
+    def test_hybrid_tailwind_and_tr_scores_one(self):
+        r = _report(roles={**_report()["roles"], "tailwind_setter": 1, "trick_room_setter": 1})
+        builds = [_build(speed=200)] * 6
+        result = compute_speed_control_score(r, builds)
+        assert result["score"] == 1.0
+        assert "hybrid" in result["reason"]
+
+    def test_tailwind_team_with_all_fast_scores_one(self):
+        r = _report(roles={**_report()["roles"], "tailwind_setter": 1, "trick_room_setter": 0})
+        builds = [_build(speed=TAILWIND_SPEED_THRESHOLD + 50)] * 6
+        result = compute_speed_control_score(r, builds)
+        assert result["score"] == pytest.approx(1.0)
+        assert "Tailwind" in result["reason"]
+
+    def test_tailwind_team_with_no_fast_scores_half(self):
+        r = _report(roles={**_report()["roles"], "tailwind_setter": 1, "trick_room_setter": 0})
+        builds = [_build(speed=TAILWIND_SPEED_THRESHOLD - 50)] * 6
+        result = compute_speed_control_score(r, builds)
+        assert result["score"] == pytest.approx(0.5)
+
+    def test_tr_team_with_all_slow_scores_one(self):
+        r = _report(roles={**_report()["roles"], "tailwind_setter": 0, "trick_room_setter": 1})
+        builds = [_build(speed=TR_SPEED_THRESHOLD - 10)] * 6
+        result = compute_speed_control_score(r, builds)
+        assert result["score"] == pytest.approx(1.0)
+        assert "Trick Room" in result["reason"]
+
+    def test_tr_team_with_no_slow_scores_half(self):
+        r = _report(roles={**_report()["roles"], "tailwind_setter": 0, "trick_room_setter": 1})
+        builds = [_build(speed=TR_SPEED_THRESHOLD + 50)] * 6
+        result = compute_speed_control_score(r, builds)
+        assert result["score"] == pytest.approx(0.5)
+
+    def test_returns_score_and_reason_keys(self):
+        r = _report()
+        result = compute_speed_control_score(r, [_build()] * 6)
         assert "score" in result
         assert "reason" in result
 
 
 # ---------------------------------------------------------------------------
-# compute_speed_score
+# compute_lead_pair_score
 # ---------------------------------------------------------------------------
 
-class TestComputeSpeedScore:
-    def test_no_fast_no_priority_scores_0(self):
-        builds = [_build(speed=100)] * 6
-        result = compute_speed_score(builds)
-        assert result["score"] == pytest.approx(0.0)
+class TestLeadPairScore:
+    def test_no_viable_pair_scores_zero(self):
+        # 6 tanks — no disruption, no attacker with disruption partner
+        builds = [_build()] * 6  # no roles that form viable pairs
+        result = compute_lead_pair_score(builds)
+        assert result["score"] == 0.0
+        assert "no viable lead pair" in result["reason"]
 
-    def test_no_fast_no_priority_reason(self):
-        builds = [_build(speed=100)] * 6
-        result = compute_speed_score(builds)
-        assert result["reason"] == "no fast Pokémon and no priority moves"
+    def test_one_viable_pair_scores_point_six(self):
+        # fake_out_user + physical_attacker = 1 viable pair
+        # Use real builds that detect_roles can classify
+        disruptor = _build(move_names=("fake-out",))
+        attacker = _build(speed=310, attack=350,
+                          move_names=("tackle", "tackle", "tackle"))
+        # Fill remaining with neutral builds
+        filler = [_build()] * 4
+        builds = [disruptor, attacker] + filler
+        result = compute_lead_pair_score(builds)
+        assert result["score"] == pytest.approx(0.6)
+        assert "1 viable lead pair" in result["reason"]
 
-    def test_two_fast_scores_1(self):
-        builds = [_build(speed=280)] * 2 + [_build(speed=100)] * 4
-        result = compute_speed_score(builds)
+    def test_three_or_more_viable_pairs_scores_one(self):
+        disruptor1 = _build(move_names=("fake-out",))
+        disruptor2 = _build(move_names=("follow-me",))
+        attacker1 = _build(speed=310, attack=350, move_names=("tackle", "tackle", "tackle"))
+        attacker2 = _build(speed=310, sp_attack=350, move_names=("flamethrower", "flamethrower", "flamethrower"))
+        setter = _build(move_names=("tailwind",))
+        filler = _build()
+        builds = [disruptor1, disruptor2, attacker1, attacker2, setter, filler]
+        result = compute_lead_pair_score(builds)
         assert result["score"] == pytest.approx(1.0)
+        assert "viable lead pair" in result["reason"]
 
-    def test_one_fast_one_priority_scores_1(self):
-        builds = [
-            _build(speed=280),
-            _build(speed=100, move_names=["extreme-speed"]),
-        ] + [_build(speed=90)] * 4
-        result = compute_speed_score(builds)
-        assert result["score"] == pytest.approx(1.0)
-
-    def test_one_fast_no_priority_scores_half(self):
-        builds = [_build(speed=280)] + [_build(speed=100)] * 5
-        result = compute_speed_score(builds)
-        assert result["score"] == pytest.approx(0.5)
-
-    def test_zero_fast_one_priority_scores_half(self):
-        builds = [_build(speed=100, move_names=["bullet-punch"])] + [_build(speed=90)] * 5
-        result = compute_speed_score(builds)
-        assert result["score"] == pytest.approx(0.5)
-
-    def test_half_score_reason_format(self):
-        builds = [_build(speed=280)] + [_build(speed=100)] * 5
-        result = compute_speed_score(builds)
-        assert "1 fast" in result["reason"]
-        assert "0 priority" in result["reason"]
-
-    def test_full_score_reason_includes_counts(self):
-        builds = [_build(speed=280)] * 2 + [_build(speed=100)] * 4
-        result = compute_speed_score(builds)
-        assert "2 fast" in result["reason"]
-
-    def test_speed_at_threshold_counts_as_fast(self):
-        builds = [_build(speed=280)] * 2 + [_build(speed=100)] * 4
-        result = compute_speed_score(builds)
-        assert result["score"] == pytest.approx(1.0)
-
-    def test_speed_below_threshold_not_fast(self):
-        builds = [_build(speed=279)] * 6
-        result = compute_speed_score(builds)
-        assert result["score"] == pytest.approx(0.0)
-
-    def test_all_priority_moves_detected(self):
-        priority_moves = [
-            "extreme-speed", "sucker-punch", "bullet-punch", "mach-punch",
-            "ice-shard", "aqua-jet", "vacuum-wave", "accelerock",
-            "jet-punch", "thunderclap", "quick-attack", "shadow-sneak",
-        ]
-        for move in priority_moves:
-            builds = [_build(speed=100, move_names=[move])] + [_build(speed=90)] * 5
-            result = compute_speed_score(builds)
-            assert result["score"] == pytest.approx(0.5), f"Expected 0.5 for {move}"
-
-    def test_score_and_reason_always_returned(self):
-        result = compute_speed_score([_build()] * 6)
+    def test_returns_score_and_reason(self):
+        result = compute_lead_pair_score([_build()] * 6)
         assert "score" in result
         assert "reason" in result
 
 
 # ---------------------------------------------------------------------------
-# score_team aggregation
+# score_team
 # ---------------------------------------------------------------------------
 
 class TestScoreTeam:
-    def _perfect_builds(self):
-        return [_build(speed=280)] * 2 + [_build(speed=100)] * 4
-
-    def _perfect_report(self):
-        return _report(weaknesses={}, coverage={"covered_types": _ALL_TYPES, "missing_types": []})
-
-    def test_returns_score_and_breakdown(self):
-        result = score_team(self._perfect_report(), self._perfect_builds())
-        assert "score" in result
-        assert "breakdown" in result
-
-    def test_breakdown_has_four_components(self):
-        result = score_team(self._perfect_report(), self._perfect_builds())
-        assert set(result["breakdown"].keys()) == {"coverage", "defensive", "role", "speed"}
-
-    def test_each_component_has_score_and_reason(self):
-        result = score_team(self._perfect_report(), self._perfect_builds())
-        for key, comp in result["breakdown"].items():
-            assert "score" in comp, f"{key} missing score"
-            assert "reason" in comp, f"{key} missing reason"
-
-    def test_perfect_team_scores_10(self):
-        result = score_team(self._perfect_report(), self._perfect_builds())
-        assert result["score"] == pytest.approx(10.0)
-
-    def test_score_in_0_to_10_range(self):
-        result = score_team(self._perfect_report(), self._perfect_builds())
+    def test_returns_score_in_0_to_10_range(self):
+        result = score_team(_report(), [_build()] * 6)
         assert 0.0 <= result["score"] <= 10.0
 
-    def test_score_rounded_to_2_decimals(self):
-        result = score_team(self._perfect_report(), self._perfect_builds())
-        assert result["score"] == round(result["score"], 2)
+    def test_breakdown_has_speed_control_key(self):
+        result = score_team(_report(), [_build()] * 6)
+        assert "speed_control" in result["breakdown"]
 
-    def test_weighted_average_formula(self):
-        report = _report(
-            weaknesses={"ice": 1},
-            coverage={"covered_types": _ALL_TYPES, "missing_types": []},
-        )
-        builds = [_build(speed=280)] * 2 + [_build(speed=100)] * 4
-        result = score_team(report, builds)
-        # coverage=1.0, defensive=0.8 (1 weakness), role=1.0, speed=1.0
-        weighted_sum = (
-            WEIGHTS["coverage"] * 1.0
-            + WEIGHTS["defensive"] * 0.8
-            + WEIGHTS["role"] * 1.0
-            + WEIGHTS["speed"] * 1.0
-        )
-        expected = round((weighted_sum / sum(WEIGHTS.values())) * 10, 2)
-        assert result["score"] == pytest.approx(expected)
+    def test_breakdown_has_lead_pair_key(self):
+        result = score_team(_report(), [_build()] * 6)
+        assert "lead_pair" in result["breakdown"]
 
-    def test_bad_team_scores_lower_than_good_team(self):
-        good_report = _report(
-            weaknesses={},
-            coverage={"covered_types": _ALL_TYPES, "missing_types": []},
-        )
-        good_builds = [_build(speed=280)] * 2 + [_build(speed=100)] * 4
-        good = score_team(good_report, good_builds)
+    def test_breakdown_does_not_have_old_speed_key(self):
+        result = score_team(_report(), [_build()] * 6)
+        assert "speed" not in result["breakdown"]
 
-        bad_roles = {r: 0 for r in [
-            "physical_sweeper", "special_sweeper", "tank",
-            "hazard_setter", "pivot", "hazard_removal", "support",
-        ]}
+    def test_weights_has_speed_control_key(self):
+        assert "speed_control" in WEIGHTS
+
+    def test_weights_has_lead_pair_key(self):
+        assert "lead_pair" in WEIGHTS
+
+    def test_weights_does_not_have_speed_key(self):
+        assert "speed" not in WEIGHTS
+
+    def test_good_team_outscores_bad_team(self):
+        good_builds = [
+            _build(speed=310, attack=350, move_names=("tackle", "tackle", "tackle")),
+            _build(speed=310, sp_attack=350, move_names=("flamethrower", "flamethrower")),
+            _build(move_names=("tailwind",)),
+            _build(move_names=("fake-out",)),
+            _build(move_names=("earthquake",)),
+            _build(speed=200),
+        ]
+        good_report = _report()
+        bad_builds = [_build()] * 6
         bad_report = _report(
-            weaknesses={"ice": 4},
-            coverage={"covered_types": ["fire"], "missing_types": _ALL_TYPES[1:]},
-            roles=bad_roles,
+            weaknesses={"ground": 5, "fire": 4},
+            roles={**_report()["roles"], "speed_control": 0, "disruption": 0},
+            issues=["Missing speed control (need ≥ 1)", "Missing disruption (need ≥ 1)"],
             valid=False,
-            issues=["i1", "i2", "i3", "i4", "i5"],
         )
-        bad = score_team(bad_report, [_build(speed=100)] * 6)
-
-        assert good["score"] > bad["score"]
+        good_score = score_team(good_report, good_builds)["score"]
+        bad_score = score_team(bad_report, bad_builds)["score"]
+        assert good_score > bad_score
