@@ -69,17 +69,22 @@ export default function PokemonNameInput({ value, onChange, onSelect, placeholde
         placeholder={placeholder}
         disabled={disabled}
         className={className}
+        style={{
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border-subtle)',
+          color: 'var(--text)',
+        }}
       />
       {showSuggestions && (
-        <ul className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-600 rounded shadow-lg overflow-hidden">
+        <ul className="absolute z-10 w-full mt-1 rounded shadow-lg overflow-hidden" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
           {suggestions.map((p) => (
             <li
               key={p.id}
               onMouseDown={() => handleSelect(p.name)}
-              className="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 cursor-pointer flex items-center justify-between"
+              className="px-3 py-2 text-sm cursor-pointer flex items-center justify-between transition-colors hover:bg-white/5" style={{ color: 'var(--text)' }}
             >
               <span>{titleCase(p.name)}</span>
-              <span className="text-xs text-gray-500">Gen {p.generation ?? '?'}</span>
+              <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>Gen {p.generation ?? '?'}</span>
             </li>
           ))}
         </ul>

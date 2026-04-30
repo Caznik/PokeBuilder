@@ -15,16 +15,30 @@ function formatEvs(evs: CompetitiveSet['evs']): string {
 }
 
 function StatBar({ label, value }: { label: string; value: number }) {
+  const pct = (value / 255) * 100
+  const color =
+    value >= 120 ? 'oklch(0.85 0.18 130)' :
+    value >= 80  ? 'oklch(0.75 0.15 80)'  :
+                   'oklch(0.60 0.12 25)'
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-gray-500 w-8">{label}</span>
-      <div className="flex-1 bg-gray-700 rounded h-1.5 overflow-hidden">
-        <div
-          className="h-full bg-blue-500 rounded"
-          style={{ width: `${(value / 180) * 100}%` }}
-        />
+    <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 32px', alignItems: 'center', gap: 8 }}>
+      <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)' }}>
+        {label}
+      </span>
+      <div style={{ height: 5, borderRadius: 3, background: 'oklch(0.22 0.005 250)', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3, transition: 'width 0.25s' }} />
       </div>
-      <span className="text-xs text-gray-400 w-8 text-right">{value}</span>
+      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'oklch(0.92 0.005 250)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-dim)', marginBottom: 8 }}>
+      {children}
     </div>
   )
 }
@@ -46,21 +60,12 @@ export default function PokemonBrowser() {
   const searchRef = useRef<HTMLDivElement>(null)
   const suppressSuggestions = useRef(false)
 
-  // Debounce query → debouncedQuery, reset to page 1 on change
   useEffect(() => {
-    if (!query) {
-      setDebouncedQuery('')
-      setPage(1)
-      return
-    }
-    const timer = setTimeout(() => {
-      setDebouncedQuery(query)
-      setPage(1)
-    }, 400)
+    if (!query) { setDebouncedQuery(''); setPage(1); return }
+    const timer = setTimeout(() => { setDebouncedQuery(query); setPage(1) }, 400)
     return () => clearTimeout(timer)
   }, [query])
 
-  // Fetch list whenever page, pageSize, or debouncedQuery changes
   useEffect(() => {
     setLoading(true)
     setError(null)
@@ -70,20 +75,13 @@ export default function PokemonBrowser() {
       .finally(() => setLoading(false))
   }, [page, pageSize, debouncedQuery])
 
-  // Suggestions — faster debounce, up to 8 matches
   useEffect(() => {
-    if (!query) {
-      setSuggestions([])
-      setShowSuggestions(false)
-      return
-    }
+    if (!query) { setSuggestions([]); setShowSuggestions(false); return }
     const timer = setTimeout(() => {
       api.pokemon.list(1, 8, query)
         .then((d) => {
           setSuggestions(d.items)
-          if (!suppressSuggestions.current) {
-            setShowSuggestions(d.items.length > 0)
-          }
+          if (!suppressSuggestions.current) setShowSuggestions(d.items.length > 0)
           suppressSuggestions.current = false
         })
         .catch(() => { suppressSuggestions.current = false })
@@ -91,12 +89,9 @@ export default function PokemonBrowser() {
     return () => clearTimeout(timer)
   }, [query])
 
-  // Close suggestions when clicking outside the search box
   useEffect(() => {
     function onMouseDown(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setShowSuggestions(false)
-      }
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setShowSuggestions(false)
     }
     document.addEventListener('mousedown', onMouseDown)
     return () => document.removeEventListener('mousedown', onMouseDown)
@@ -119,18 +114,25 @@ export default function PokemonBrowser() {
         setSelected(detail)
         setSelectedSets(sets)
         Promise.all(
-          detail.abilities.map((a) =>
-            api.abilities.getByName(a.ability_name).catch(() => null)
-          )
-        ).then((results) => {
-          setAbilityDetails(results.filter((r): r is AbilityDetail => r !== null))
-        })
+          detail.abilities.map((a) => api.abilities.getByName(a.ability_name).catch(() => null))
+        ).then((results) => setAbilityDetails(results.filter((r): r is AbilityDetail => r !== null)))
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setDetailLoading(false))
   }
 
   const totalPages = data ? Math.ceil(data.total / pageSize) : 1
+
+  const inputStyle: React.CSSProperties = {
+    background: 'var(--surface-2)',
+    border: '1px solid var(--border-subtle)',
+    color: 'var(--text)',
+    borderRadius: 6,
+    padding: '7px 12px',
+    fontSize: 13,
+    width: '100%',
+    outline: 'none',
+  }
 
   return (
     <div>
@@ -145,67 +147,64 @@ export default function PokemonBrowser() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true) }}
-            className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            style={{ ...inputStyle, width: '100%' }}
           />
           {showSuggestions && (
-            <ul className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-600 rounded shadow-lg overflow-hidden">
+            <ul className="absolute z-10 w-full mt-1 rounded shadow-lg overflow-hidden" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
               {suggestions.map((p) => (
                 <li
                   key={p.id}
                   onMouseDown={() => handleSuggestionClick(p.name)}
-                  className="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 cursor-pointer flex items-center justify-between"
+                  className="px-3 py-2 cursor-pointer flex items-center justify-between hover:bg-white/5 transition-colors"
+                  style={{ fontSize: 13, color: 'var(--text)' }}
                 >
                   <span>{titleCase(p.name)}</span>
-                  <span className="text-xs text-gray-500">Gen {p.generation ?? '?'}</span>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>Gen {p.generation ?? '?'}</span>
                 </li>
               ))}
             </ul>
           )}
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-400 shrink-0">
+        <div className="flex items-center gap-2 shrink-0" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
           <span>Show</span>
           <select
             value={pageSize}
             onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}
-            className="bg-gray-800 border border-gray-600 rounded px-2 py-2 text-gray-200 focus:outline-none focus:border-blue-500"
+            style={{ ...inputStyle, width: 'auto', padding: '7px 28px 7px 10px', cursor: 'pointer' }}
           >
-            {[10, 25, 50].map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
+            {[10, 25, 50].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
       </div>
 
-      {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
+      {error && <p className="text-sm mb-3" style={{ color: 'oklch(0.65 0.18 25)' }}>{error}</p>}
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-lg" style={{ border: '1px solid var(--border)' }}>
+        <table className="w-full" style={{ fontSize: 13 }}>
           <thead>
-            <tr className="border-b border-gray-700 text-gray-400 text-left">
+            <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
               {['Name', 'Gen', 'HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe'].map((h) => (
-                <th key={h} className="pb-2 pr-4 font-medium">{h}</th>
+                <th key={h} className="pb-2 pt-2 pr-4 pl-3 text-left" style={{ fontSize: 10, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-dim)', fontWeight: 500 }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8} className="py-4 text-gray-500 text-center">Loading...</td></tr>
+              <tr><td colSpan={8} className="py-6 text-center" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading...</td></tr>
             )}
             {!loading && data?.items.map((p) => (
               <tr
                 key={p.id}
                 onClick={() => handleRowClick(p.name)}
-                className="border-b border-gray-800 hover:bg-gray-800 cursor-pointer"
+                className="cursor-pointer transition-colors hover:bg-white/[0.03]"
+                style={{ borderBottom: '1px solid var(--border)' }}
               >
-                <td className="py-2 pr-4 text-blue-300">{titleCase(p.name)}</td>
-                <td className="py-2 pr-4 text-gray-400">{p.generation ?? '—'}</td>
-                <td className="py-2 pr-4">{p.base_hp}</td>
-                <td className="py-2 pr-4">{p.base_attack}</td>
-                <td className="py-2 pr-4">{p.base_defense}</td>
-                <td className="py-2 pr-4">{p.base_sp_attack}</td>
-                <td className="py-2 pr-4">{p.base_sp_defense}</td>
-                <td className="py-2 pr-4">{p.base_speed}</td>
+                <td className="py-2 pr-4 pl-3" style={{ color: 'oklch(0.70 0.13 240)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>{titleCase(p.name)}</td>
+                <td className="py-2 pr-4" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>{p.generation ?? '—'}</td>
+                {[p.base_hp, p.base_attack, p.base_defense, p.base_sp_attack, p.base_sp_defense, p.base_speed].map((v, i) => (
+                  <td key={i} className="py-2 pr-4" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontVariantNumeric: 'tabular-nums', color: 'oklch(0.85 0.005 250)' }}>{v}</td>
+                ))}
               </tr>
             ))}
           </tbody>
@@ -214,13 +213,14 @@ export default function PokemonBrowser() {
 
       {/* Pagination */}
       {data && (
-        <div className="flex items-center justify-between mt-3 text-sm text-gray-400">
+        <div className="flex items-center justify-between mt-3" style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
           <span>Showing {data.items.length} of {data.total}</span>
           <div className="flex gap-2">
             <button
               disabled={page === 1}
               onClick={() => setPage((p) => p - 1)}
-              className="px-3 py-1 bg-gray-800 rounded disabled:opacity-40 hover:bg-gray-700"
+              className="px-3 py-1 rounded disabled:opacity-40 transition-colors hover:bg-white/5"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 12 }}
             >
               ← Prev
             </button>
@@ -228,7 +228,8 @@ export default function PokemonBrowser() {
             <button
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1 bg-gray-800 rounded disabled:opacity-40 hover:bg-gray-700"
+              className="px-3 py-1 rounded disabled:opacity-40 transition-colors hover:bg-white/5"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 12 }}
             >
               Next →
             </button>
@@ -237,22 +238,22 @@ export default function PokemonBrowser() {
       )}
 
       {/* Detail panel */}
-      {detailLoading && <p className="mt-6 text-gray-500 text-sm">Loading details...</p>}
+      {detailLoading && (
+        <p className="mt-6" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading details...</p>
+      )}
 
       {selected && selectedSets && (
-        <div className="mt-6 bg-gray-900 border border-gray-700 rounded-lg p-5">
+        <div className="mt-6 rounded-lg p-5" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
           {/* Name + types header */}
-          <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-lg font-bold">{titleCase(selected.name)}</h2>
-            <div className="flex gap-1">
-              {selected.types.map((t) => (
-                <TypeBadge key={t.type_id} typeName={t.type_name} />
-              ))}
+          <div className="flex items-center gap-3 mb-5">
+            <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-mono)' }}>{titleCase(selected.name)}</h2>
+            <div className="flex gap-1.5">
+              {selected.types.map((t) => <TypeBadge key={t.type_id} typeName={t.type_name} />)}
             </div>
           </div>
 
-          {/* Two-column: image | stats */}
-          <div className="flex gap-6 mb-5">
+          {/* Sprite + stats */}
+          <div className="flex gap-6 mb-6">
             <img
               src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${selected.id}.png`}
               alt={selected.name}
@@ -260,9 +261,9 @@ export default function PokemonBrowser() {
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
             />
             <div className="flex-1">
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Base Stats</p>
+              <SectionLabel>Base Stats</SectionLabel>
               <div className="space-y-2">
-                <StatBar label="HP" value={selected.base_hp} />
+                <StatBar label="HP"  value={selected.base_hp} />
                 <StatBar label="Atk" value={selected.base_attack} />
                 <StatBar label="Def" value={selected.base_defense} />
                 <StatBar label="SpA" value={selected.base_sp_attack} />
@@ -272,20 +273,20 @@ export default function PokemonBrowser() {
             </div>
           </div>
 
-          {/* Abilities — full width */}
-          <div className="mb-5">
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Abilities</p>
+          {/* Abilities */}
+          <div className="mb-6">
+            <SectionLabel>Abilities</SectionLabel>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {selected.abilities.map((a) => {
                 const detail = abilityDetails.find((d) => d.name === a.ability_name)
                 return (
-                  <div key={a.ability_id} className="bg-gray-800 rounded px-3 py-2">
-                    <p className="text-xs font-medium">
+                  <div key={a.ability_id} className="rounded px-3 py-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+                    <p style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text)' }}>
                       {titleCase(a.ability_name)}
-                      {a.is_hidden && <span className="ml-1 text-gray-500">(HA)</span>}
+                      {a.is_hidden && <span style={{ marginLeft: 6, color: 'var(--text-dim)', fontWeight: 400 }}>(HA)</span>}
                     </p>
                     {detail?.description && (
-                      <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                      <p className="mt-1 leading-relaxed" style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                         {detail.description}
                       </p>
                     )}
@@ -295,29 +296,31 @@ export default function PokemonBrowser() {
             </div>
           </div>
 
-          {/* Competitive sets — full width */}
+          {/* Competitive sets */}
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-              Competitive Sets ({selectedSets.sets.length})
-            </p>
+            <SectionLabel>Competitive Sets ({selectedSets.sets.length})</SectionLabel>
             {selectedSets.sets.length === 0 ? (
-              <p className="text-gray-500 text-sm">No competitive sets available for this Pokémon.</p>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>No competitive sets available.</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {selectedSets.sets.map((set) => (
-                  <div key={set.id} className="bg-gray-800 rounded p-3">
-                    <p className="font-medium text-sm mb-1">{set.name ?? `Set #${set.id}`}</p>
-                    <p className="text-xs text-gray-400">
+                  <div key={set.id} className="rounded p-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+                    <p style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+                      {set.name ?? `Set #${set.id}`}
+                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>
                       {[
-                        set.nature && `Nature: ${set.nature}`,
-                        set.ability && `Ability: ${set.ability}`,
-                        set.item && `Item: ${set.item}`,
+                        set.nature && `${titleCase(set.nature)}`,
+                        set.ability && titleCase(set.ability),
+                        set.item && set.item,
                       ].filter(Boolean).join(' · ')}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">EVs: {formatEvs(set.evs)}</p>
-                    <ul className="mt-2 space-y-0.5">
+                    <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-dim)', marginBottom: 6 }}>
+                      {formatEvs(set.evs)}
+                    </p>
+                    <ul className="space-y-0.5">
                       {set.moves.map((m, i) => (
-                        <li key={i} className="text-xs text-gray-300">• {titleCase(m)}</li>
+                        <li key={i} style={{ fontSize: 11, color: 'oklch(0.80 0.005 250)' }}>· {titleCase(m)}</li>
                       ))}
                     </ul>
                   </div>

@@ -14,7 +14,7 @@ function titleCase(name: string): string {
 
 export default function TeamResultCard({ team, rank }: TeamResultCardProps) {
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 space-y-4">
+    <div className="rounded-lg p-4 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
       {/* Header */}
       <div className="flex items-center gap-4">
         <span className="text-gray-400 font-medium">Team #{rank}</span>
@@ -26,9 +26,9 @@ export default function TeamResultCard({ team, rank }: TeamResultCardProps) {
       {/* Members */}
       <div className="flex flex-wrap gap-2">
         {team.members.map((m, i) => (
-          <div key={i} className="bg-gray-800 rounded px-3 py-1.5 text-center">
-            <div className="text-sm font-medium">{titleCase(m.pokemon_name)}</div>
-            <div className="text-xs text-gray-500">
+          <div key={i} className="rounded px-3 py-1.5 text-center" style={{ background: 'var(--surface-2)' }}>
+            <div className="text-sm font-medium" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{titleCase(m.pokemon_name)}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
               {m.set_name
                 ? m.set_name
                 : [m.nature, m.ability].filter(Boolean).map(titleCase).join(' · ') || null}
@@ -39,7 +39,7 @@ export default function TeamResultCard({ team, rank }: TeamResultCardProps) {
 
       {/* Breakdown collapsible */}
       <details className="group">
-        <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-200 select-none">
+        <summary className="cursor-pointer select-none" style={{ fontSize: 10, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
           ▶ Score Breakdown
         </summary>
         <div className="mt-3 pl-2">
@@ -49,7 +49,7 @@ export default function TeamResultCard({ team, rank }: TeamResultCardProps) {
 
       {/* Analysis collapsible */}
       <details className="group">
-        <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-200 select-none">
+        <summary className="cursor-pointer select-none" style={{ fontSize: 10, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
           ▶ Team Analysis
         </summary>
         <div className="mt-3 pl-2">

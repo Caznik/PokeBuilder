@@ -104,22 +104,23 @@ export default function PokemonTagInput({ value, onChange, placeholder, label, m
           onChange={(e) => applyChange(e.target.value)}
           onFocus={() => { if (suggestions.length > 0 && !isAtMax) setShowSuggestions(true) }}
           placeholder={isAtMax ? 'Remove a Pokémon to add more' : placeholder}
-          className={`w-full bg-gray-800 border rounded px-3 py-2 text-sm placeholder-gray-500 focus:outline-none transition-colors
-            ${isAtMax
-              ? 'border-red-800 text-gray-400 focus:border-red-700'
-              : 'border-gray-600 text-gray-200 focus:border-blue-500'
-            }`}
+          className="w-full rounded px-3 py-2 text-sm placeholder-gray-500 transition-colors"
+          style={{
+            background: 'var(--surface-2)',
+            border: isAtMax ? '1px solid oklch(0.45 0.12 25)' : '1px solid var(--border-subtle)',
+            color: isAtMax ? 'var(--text-muted)' : 'var(--text)',
+          }}
         />
         {showSuggestions && !isAtMax && (
-          <ul className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-600 rounded shadow-lg overflow-hidden">
+          <ul className="absolute z-10 w-full mt-1 rounded shadow-lg overflow-hidden" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             {suggestions.map((p) => (
               <li
                 key={p.id}
                 onMouseDown={() => handleSelect(p.name)}
-                className="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 cursor-pointer flex items-center justify-between"
+                className="px-3 py-2 text-sm cursor-pointer flex items-center justify-between transition-colors hover:bg-white/5" style={{ color: 'var(--text)' }}
               >
                 <span>{titleCase(p.name)}</span>
-                <span className="text-xs text-gray-500">Gen {p.generation ?? '?'}</span>
+                <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>Gen {p.generation ?? '?'}</span>
               </li>
             ))}
           </ul>

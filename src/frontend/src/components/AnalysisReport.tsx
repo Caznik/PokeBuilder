@@ -13,6 +13,23 @@ const ARCHETYPE_LABELS: Record<string, string> = {
   none: 'None',
 }
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontSize: 9,
+        fontFamily: 'var(--font-mono)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.1em',
+        color: 'var(--text-dim)',
+        marginBottom: 6,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
 export default function AnalysisReport({ analysis }: AnalysisReportProps) {
   const sortedWeaknesses = Object.entries(analysis.weaknesses)
     .filter(([, v]) => v > 0)
@@ -27,11 +44,15 @@ export default function AnalysisReport({ analysis }: AnalysisReportProps) {
       {/* Validity */}
       <div>
         {analysis.valid ? (
-          <span className="text-green-400 font-medium">✓ Valid team</span>
+          <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600 }}>
+            ✓ Valid team
+          </span>
         ) : (
           <div>
-            <span className="text-red-400 font-medium">✗ Issues found</span>
-            <ul className="mt-1 list-disc list-inside text-red-300 text-xs space-y-0.5">
+            <span style={{ color: 'oklch(0.65 0.18 25)', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600 }}>
+              ✗ Issues found
+            </span>
+            <ul className="mt-1 list-disc list-inside space-y-0.5" style={{ fontSize: 11, color: 'oklch(0.60 0.14 25)' }}>
               {analysis.issues.map((issue, i) => (
                 <li key={i}>{issue}</li>
               ))}
@@ -42,18 +63,28 @@ export default function AnalysisReport({ analysis }: AnalysisReportProps) {
 
       {/* Speed control archetype */}
       <div>
-        <span className="text-gray-400 text-xs uppercase tracking-wide">Speed Control</span>
-        <div className="mt-1">
-          <span className="bg-blue-900 text-blue-300 border border-blue-700 rounded px-2 py-0.5 text-xs">
-            {ARCHETYPE_LABELS[analysis.speed_control_archetype] ?? analysis.speed_control_archetype}
-          </span>
-        </div>
+        <SectionLabel>Speed Control</SectionLabel>
+        <span
+          style={{
+            background: 'oklch(0.22 0.04 130)',
+            color: 'var(--accent)',
+            border: '1px solid oklch(0.35 0.08 130)',
+            borderRadius: 4,
+            padding: '2px 8px',
+            fontSize: 10,
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 500,
+            display: 'inline-block',
+          }}
+        >
+          {ARCHETYPE_LABELS[analysis.speed_control_archetype] ?? analysis.speed_control_archetype}
+        </span>
       </div>
 
       {/* Roles */}
       <div>
-        <span className="text-gray-400 text-xs uppercase tracking-wide">Roles</span>
-        <div className="mt-1 flex flex-wrap gap-1">
+        <SectionLabel>Roles</SectionLabel>
+        <div className="flex flex-wrap gap-1">
           {Object.entries(analysis.roles).map(([role, count]) => (
             <RoleChip key={role} role={role} count={count} />
           ))}
@@ -63,12 +94,12 @@ export default function AnalysisReport({ analysis }: AnalysisReportProps) {
       {/* Weaknesses */}
       {sortedWeaknesses.length > 0 && (
         <div>
-          <span className="text-gray-400 text-xs uppercase tracking-wide">Weaknesses</span>
-          <div className="mt-1 flex flex-wrap gap-2">
+          <SectionLabel>Weaknesses</SectionLabel>
+          <div className="flex flex-wrap gap-2">
             {sortedWeaknesses.map(([type, count]) => (
               <span key={type} className="flex items-center gap-1">
                 <TypeBadge typeName={type} />
-                <span className="text-xs text-gray-400">×{count}</span>
+                <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>×{count}</span>
               </span>
             ))}
           </div>
@@ -78,12 +109,12 @@ export default function AnalysisReport({ analysis }: AnalysisReportProps) {
       {/* Resistances */}
       {sortedResistances.length > 0 && (
         <div>
-          <span className="text-gray-400 text-xs uppercase tracking-wide">Resistances</span>
-          <div className="mt-1 flex flex-wrap gap-2">
+          <SectionLabel>Resistances</SectionLabel>
+          <div className="flex flex-wrap gap-2">
             {sortedResistances.map(([type, count]) => (
               <span key={type} className="flex items-center gap-1">
                 <TypeBadge typeName={type} />
-                <span className="text-xs text-gray-400">×{count}</span>
+                <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>×{count}</span>
               </span>
             ))}
           </div>
@@ -93,10 +124,10 @@ export default function AnalysisReport({ analysis }: AnalysisReportProps) {
       {/* Coverage gaps */}
       {analysis.coverage.missing_types.length > 0 && (
         <div>
-          <span className="text-gray-400 text-xs uppercase tracking-wide">Coverage Gaps</span>
-          <div className="mt-1 flex flex-wrap gap-1">
+          <SectionLabel>Coverage Gaps</SectionLabel>
+          <div className="flex flex-wrap gap-1">
             {analysis.coverage.missing_types.map((type) => (
-              <span key={type} className="opacity-60">
+              <span key={type} style={{ opacity: 0.55 }}>
                 <TypeBadge typeName={type} />
               </span>
             ))}

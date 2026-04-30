@@ -107,7 +107,7 @@ export default function TeamAnalyzer() {
       {/* 6 slots */}
       <div className="space-y-3 mb-6">
         {slots.map((slot, i) => (
-          <div key={i} className="bg-gray-900 border border-gray-700 rounded-lg p-3">
+          <div key={i} className="rounded-lg p-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xs text-gray-500 w-5">{i + 1}.</span>
               <PokemonNameInput
@@ -115,12 +115,12 @@ export default function TeamAnalyzer() {
                 onChange={(v) => updateNameInput(i, v)}
                 onSelect={(name) => loadSets(i, name)}
                 placeholder="Pokémon name"
-                className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                className="w-full rounded px-3 py-1.5 text-sm placeholder-gray-500"
               />
               <button
                 onClick={() => loadSets(i)}
                 disabled={slot.setsLoading || !nameInputs[i].trim()}
-                className="bg-blue-700 hover:bg-blue-600 disabled:opacity-40 text-white text-xs px-3 py-1.5 rounded"
+                className="disabled:opacity-40 text-xs px-3 py-1.5 rounded transition-colors" style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
               >
                 {slot.setsLoading ? '...' : 'Load'}
               </button>
@@ -142,7 +142,7 @@ export default function TeamAnalyzer() {
                 <select
                   value={slot.selectedSetId ?? ''}
                   onChange={(e) => updateSlot(i, { selectedSetId: Number(e.target.value) })}
-                  className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+                  className="flex-1 rounded px-2 py-1 text-xs" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}
                 >
                   <option value="">— pick a set —</option>
                   {slot.sets.map((s) => (
@@ -166,14 +166,14 @@ export default function TeamAnalyzer() {
         <button
           onClick={handleScore}
           disabled={!allFilled || submitting}
-          className="bg-green-700 hover:bg-green-600 disabled:opacity-40 text-white text-sm font-medium px-4 py-2 rounded"
+          className="disabled:opacity-40 text-sm font-medium px-4 py-2 rounded transition-colors" style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
         >
           {submitting ? 'Submitting...' : 'Score Team'}
         </button>
         <button
           onClick={handleAnalyze}
           disabled={!allFilled || submitting}
-          className="bg-gray-700 hover:bg-gray-600 disabled:opacity-40 text-white text-sm font-medium px-4 py-2 rounded"
+          className="disabled:opacity-40 text-sm font-medium px-4 py-2 rounded transition-colors" style={{ background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border-subtle)' }}
         >
           {submitting ? 'Submitting...' : 'Analyze Only'}
         </button>
@@ -183,7 +183,7 @@ export default function TeamAnalyzer() {
 
       {/* Score result */}
       {scoreResult && (
-        <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 space-y-4">
+        <div className="rounded-lg p-4 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
           <div className="flex items-center gap-4">
             <span className="text-gray-400 font-medium">Team Score</span>
             <div className="flex-1">
@@ -197,7 +197,7 @@ export default function TeamAnalyzer() {
 
       {/* Analyze only result */}
       {analyzeResult && (
-        <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
+        <div className="rounded-lg p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
           <AnalysisReport analysis={analyzeResult} />
         </div>
       )}

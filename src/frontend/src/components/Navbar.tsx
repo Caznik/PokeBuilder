@@ -9,17 +9,28 @@ const links = [
 
 export default function Navbar() {
   return (
-    <nav className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center gap-6">
-      <span className="text-blue-400 font-bold text-lg mr-4">PokeBuilder</span>
+    <nav
+      className="flex items-center gap-6 px-5 py-3"
+      style={{
+        background: 'var(--surface)',
+        borderBottom: '1px solid var(--border)',
+      }}
+    >
+      <span
+        className="mr-4 font-mono font-semibold text-base tracking-tight"
+        style={{ color: 'var(--accent)' }}
+      >
+        PokéBuilder
+      </span>
       {links.map(({ to, label }) => (
         <NavLink
           key={to}
           to={to}
-          className={({ isActive }) =>
-            isActive
-              ? 'text-blue-400 font-semibold text-sm'
-              : 'text-gray-400 hover:text-gray-200 text-sm'
-          }
+          className="text-sm transition-colors"
+          style={({ isActive }) => ({
+            color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+            fontWeight: isActive ? 600 : 400,
+          })}
         >
           {label}
         </NavLink>

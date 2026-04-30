@@ -44,7 +44,7 @@ export default function TeamGenerator() {
     <div>
       <h1 className="text-xl font-bold mb-4">Team Generator</h1>
 
-      <form onSubmit={handleSubmit} className="bg-gray-900 border border-gray-700 rounded-lg p-4 mb-6 space-y-4">
+      <form onSubmit={handleSubmit} className="rounded-lg p-4 mb-6 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
         <PokemonTagInput
           label="Include Pokémon (comma-separated)"
           value={includeInput}
@@ -61,7 +61,7 @@ export default function TeamGenerator() {
         <button
           type="submit"
           disabled={loading}
-          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded"
+          className="disabled:opacity-40 text-sm font-medium px-4 py-2 rounded transition-colors" style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
         >
           {loading ? 'Generating...' : 'Generate Teams'}
         </button>

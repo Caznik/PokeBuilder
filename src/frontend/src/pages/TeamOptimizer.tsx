@@ -46,7 +46,7 @@ export default function TeamOptimizer() {
     <div>
       <h1 className="text-xl font-bold mb-4">Team Optimizer</h1>
 
-      <form onSubmit={handleSubmit} className="bg-gray-900 border border-gray-700 rounded-lg p-4 mb-6 space-y-4">
+      <form onSubmit={handleSubmit} className="rounded-lg p-4 mb-6 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
         <PokemonTagInput
           label="Include Pokémon (comma-separated)"
           value={includeInput}
@@ -71,7 +71,7 @@ export default function TeamOptimizer() {
             min={10} max={100} step={10}
             value={populationSize}
             onChange={(e) => setPopulationSize(Number(e.target.value))}
-            className="w-full accent-blue-500"
+            className="w-full"
           />
         </div>
 
@@ -85,14 +85,14 @@ export default function TeamOptimizer() {
             min={5} max={50} step={5}
             value={generations}
             onChange={(e) => setGenerations(Number(e.target.value))}
-            className="w-full accent-blue-500"
+            className="w-full"
           />
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded"
+          className="disabled:opacity-40 text-sm font-medium px-4 py-2 rounded transition-colors" style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
         >
           {loading ? 'Running genetic algorithm... this may take a few seconds.' : 'Run Optimizer'}
         </button>
