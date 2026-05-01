@@ -4,7 +4,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from ..db import get_db_cursor
-from ..models.pokemon import Pokemon, PokemonDetail, PokemonList, PokemonAbility, PokemonType
+from ..models.pokemon import PokemonWithTypes, PokemonDetail, PokemonList, PokemonAbility, PokemonType
 
 router = APIRouter(prefix="/pokemon", tags=["pokemon"])
 
@@ -14,35 +14,38 @@ def list_pokemon(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     generation: Optional[int] = Query(None, description="Filter by generation"),
-    name: Optional[str] = Query(None, description="Filter by name (partial match)")
+    name: Optional[str] = Query(None, description="Filter by name (partial match)"),
+    type_name: Optional[str] = Query(None, alias="type", description="Filter by type name"),
 ):
-    """Get a paginated list of Pokemon."""
+    """Get a paginated list of Pokemon with their types."""
     offset = (page - 1) * page_size
-    
-    # Build the query
+
     where_clauses = []
     params = []
-    
+
     if generation is not None:
         where_clauses.append("generation = %s")
         params.append(generation)
-    
+
     if name:
         where_clauses.append("name ILIKE %s")
         params.append(f"%{name}%")
-    
-    where_sql = ""
-    if where_clauses:
-        where_sql = "WHERE " + " AND ".join(where_clauses)
-    
+
+    if type_name:
+        where_clauses.append(
+            "id IN (SELECT pt.pokemon_id FROM pokemon_types pt "
+            "JOIN types t ON t.id = pt.type_id WHERE t.name ILIKE %s)"
+        )
+        params.append(type_name)
+
+    where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
     with get_db_cursor() as cursor:
-        # Get total count
-        count_sql = f"SELECT COUNT(*) FROM pokemon {where_sql}"
-        cursor.execute(count_sql, params)
+        cursor.execute(f"SELECT COUNT(*) FROM pokemon {where_sql}", params)
         total = cursor.fetchone()[0]
-        
-        # Get items
-        sql = f"""
+
+        cursor.execute(
+            f"""
             SELECT id, name, generation,
                    base_hp, base_attack, base_defense,
                    base_sp_attack, base_sp_defense, base_speed
@@ -50,31 +53,39 @@ def list_pokemon(
             {where_sql}
             ORDER BY id
             LIMIT %s OFFSET %s
-        """
-        cursor.execute(sql, params + [page_size, offset])
+            """,
+            params + [page_size, offset],
+        )
         rows = cursor.fetchall()
-        
+
+        types_map: dict = {}
+        if rows:
+            pokemon_ids = [row[0] for row in rows]
+            cursor.execute(
+                """
+                SELECT pt.pokemon_id, t.id, t.name
+                FROM pokemon_types pt
+                JOIN types t ON pt.type_id = t.id
+                WHERE pt.pokemon_id = ANY(%s)
+                """,
+                (pokemon_ids,),
+            )
+            for tr in cursor.fetchall():
+                types_map.setdefault(tr[0], []).append(
+                    PokemonType(type_id=tr[1], type_name=tr[2])
+                )
+
         items = [
-            Pokemon(
-                id=row[0],
-                name=row[1],
-                generation=row[2],
-                base_hp=row[3],
-                base_attack=row[4],
-                base_defense=row[5],
-                base_sp_attack=row[6],
-                base_sp_defense=row[7],
-                base_speed=row[8]
+            PokemonWithTypes(
+                id=row[0], name=row[1], generation=row[2],
+                base_hp=row[3], base_attack=row[4], base_defense=row[5],
+                base_sp_attack=row[6], base_sp_defense=row[7], base_speed=row[8],
+                types=types_map.get(row[0], []),
             )
             for row in rows
         ]
-    
-    return PokemonList(
-        total=total,
-        items=items,
-        page=page,
-        page_size=page_size
-    )
+
+    return PokemonList(total=total, items=items, page=page, page_size=page_size)
 
 
 @router.get("/{pokemon_id}", response_model=PokemonDetail)

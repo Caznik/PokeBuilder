@@ -33,11 +33,20 @@ export interface PokemonDetail extends Pokemon {
   types: PokemonType[]
 }
 
+export interface PokemonWithTypes extends Pokemon {
+  types: PokemonType[]
+}
+
 export interface PokemonList {
   total: number
-  items: Pokemon[]
+  items: PokemonWithTypes[]
   page: number
   page_size: number
+}
+
+export interface TypeListItem {
+  id: number
+  name: string
 }
 
 // Competitive sets
@@ -137,4 +146,47 @@ export interface OptimizationResponse {
   generations_run: number
   initial_population: number
   evaluations: number
+}
+
+// Saved teams
+export interface SavedTeamMember {
+  slot: number
+  pokemon_name: string
+  set_id: number
+  set_name: string | null
+  nature: string | null
+  ability: string | null
+}
+
+export interface SavedTeamSummary {
+  id: number
+  name: string
+  score: number
+  created_at: string
+  members: SavedTeamMember[]
+}
+
+export interface SavedTeamDetail extends SavedTeamSummary {
+  breakdown: ScoreBreakdown
+  analysis: TeamAnalysisResponse
+}
+
+export interface SaveTeamRequest {
+  name: string
+  members: TeamMemberInput[]
+  score: number
+  breakdown: ScoreBreakdown
+  analysis: TeamAnalysisResponse
+}
+
+export interface UpdateTeamRequest {
+  name?: string
+  score?: number
+  breakdown?: ScoreBreakdown
+  analysis?: TeamAnalysisResponse
+}
+
+export interface UpdateMemberRequest {
+  pokemon_name: string
+  set_id: number
 }

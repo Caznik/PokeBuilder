@@ -3,7 +3,8 @@ import Navbar from './components/Navbar'
 import PokemonBrowser from './pages/PokemonBrowser'
 import TeamGenerator from './pages/TeamGenerator'
 import TeamOptimizer from './pages/TeamOptimizer'
-import TeamAnalyzer from './pages/TeamAnalyzer'
+import Teams from './pages/Teams'
+import TeamDetail from './pages/TeamDetail'
 
 export default function App() {
   return (
@@ -15,7 +16,11 @@ export default function App() {
           <Route path="/pokemon" element={<PokemonBrowser />} />
           <Route path="/generate" element={<TeamGenerator />} />
           <Route path="/optimize" element={<TeamOptimizer />} />
-          <Route path="/analyze" element={<TeamAnalyzer />} />
+          <Route path="/teams" element={<Teams />} />
+          <Route path="/teams/:id" element={<TeamDetail />} />
+          <Route path="/build" element={<Navigate to="/teams" replace />} />
+          <Route path="/analyze" element={<Navigate to="/teams" replace />} />
+          <Route path="/saved" element={<Navigate to="/teams?tab=saved" replace />} />
         </Routes>
       </main>
     </BrowserRouter>

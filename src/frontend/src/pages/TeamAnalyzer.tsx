@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { api } from '../api/client'
 import type {
   CompetitiveSet,
   ScoreResponse,
   TeamAnalysisResponse,
+  SavedTeamMember,
 } from '../api/types'
 import ScoreBar from '../components/ScoreBar'
 import BreakdownTable from '../components/BreakdownTable'
@@ -27,6 +29,7 @@ function titleCase(name: string): string {
 }
 
 export default function TeamAnalyzer() {
+  const location = useLocation()
   const [slots, setSlots] = useState<SlotState[]>(() => Array.from({ length: 6 }, emptySlot))
   const [nameInputs, setNameInputs] = useState<string[]>(() => Array(6).fill(''))
   const [scoreResult, setScoreResult] = useState<ScoreResponse | null>(null)
@@ -42,13 +45,13 @@ export default function TeamAnalyzer() {
     setNameInputs((prev) => prev.map((v, i) => (i === index ? value : v)))
   }
 
-  async function loadSets(index: number, nameOverride?: string) {
+  async function loadSets(index: number, nameOverride?: string, setIdOverride?: number) {
     const name = (nameOverride ?? nameInputs[index]).trim()
     if (!name) return
     updateSlot(index, { setsLoading: true, setsError: null, sets: [], selectedSetId: null, pokemonName: name })
     try {
       const res = await api.competitiveSets.get(name.toLowerCase())
-      const autoSelect = res.sets.length === 1 ? res.sets[0].id : null
+      const autoSelect = setIdOverride ?? (res.sets.length === 1 ? res.sets[0].id : null)
       updateSlot(index, { sets: res.sets, selectedSetId: autoSelect, setsLoading: false })
     } catch (e: unknown) {
       updateSlot(index, {
@@ -57,6 +60,13 @@ export default function TeamAnalyzer() {
       })
     }
   }
+
+  useEffect(() => {
+    const state = location.state as { members?: SavedTeamMember[] } | null
+    if (!state?.members?.length) return
+    setNameInputs(state.members.map((m) => m.pokemon_name))
+    state.members.forEach((m, i) => loadSets(i, m.pokemon_name, m.set_id))
+  }, [])
 
   function clearSlot(index: number) {
     updateSlot(index, emptySlot())
