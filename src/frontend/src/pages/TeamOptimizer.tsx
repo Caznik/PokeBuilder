@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api/client'
-import type { OptimizationResponse, GenerationConstraints } from '../api/types'
+import type { OptimizationResponse, GenerationConstraints, TeamResult } from '../api/types'
 import TeamResultCard from '../components/TeamResultCard'
 import PokemonTagInput from '../components/PokemonTagInput'
 
@@ -41,6 +41,16 @@ export default function TeamOptimizer() {
   const sortedTeams = result
     ? [...result.best_teams].sort((a, b) => b.score - a.score)
     : []
+
+  async function handleSave(team: TeamResult, name: string) {
+    await api.savedTeams.save({
+      name,
+      score: team.score,
+      breakdown: team.breakdown,
+      members: team.members.map((m) => ({ pokemon_name: m.pokemon_name, set_id: m.set_id })),
+      analysis: team.analysis,
+    })
+  }
 
   return (
     <div>
@@ -109,7 +119,12 @@ export default function TeamOptimizer() {
           </p>
           <div className="space-y-4">
             {sortedTeams.map((team, i) => (
-              <TeamResultCard key={i} team={team} rank={i + 1} />
+              <TeamResultCard
+                key={i}
+                team={team}
+                rank={i + 1}
+                onSave={(name) => handleSave(team, name)}
+              />
             ))}
           </div>
         </div>

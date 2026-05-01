@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api/client'
-import type { GenerationResponse, GenerationConstraints } from '../api/types'
+import type { GenerationResponse, GenerationConstraints, TeamResult } from '../api/types'
 import TeamResultCard from '../components/TeamResultCard'
 import PokemonTagInput from '../components/PokemonTagInput'
 
@@ -40,6 +40,16 @@ export default function TeamGenerator() {
     ? [...result.teams].sort((a, b) => b.score - a.score)
     : []
 
+  async function handleSave(team: TeamResult, name: string) {
+    await api.savedTeams.save({
+      name,
+      score: team.score,
+      breakdown: team.breakdown,
+      members: team.members.map((m) => ({ pokemon_name: m.pokemon_name, set_id: m.set_id })),
+      analysis: team.analysis,
+    })
+  }
+
   return (
     <div>
       <h1 className="text-xl font-bold mb-4">Team Generator</h1>
@@ -77,7 +87,12 @@ export default function TeamGenerator() {
           </p>
           <div className="space-y-4">
             {sortedTeams.map((team, i) => (
-              <TeamResultCard key={i} team={team} rank={i + 1} />
+              <TeamResultCard
+                key={i}
+                team={team}
+                rank={i + 1}
+                onSave={(name) => handleSave(team, name)}
+              />
             ))}
           </div>
         </div>

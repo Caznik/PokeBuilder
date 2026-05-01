@@ -4,7 +4,7 @@ const links = [
   { to: '/pokemon', label: 'Pokémon' },
   { to: '/generate', label: 'Generator' },
   { to: '/optimize', label: 'Optimizer' },
-  { to: '/analyze', label: 'Analyzer' },
+  { to: '/teams', label: 'Teams' },
 ]
 
 export default function Navbar() {

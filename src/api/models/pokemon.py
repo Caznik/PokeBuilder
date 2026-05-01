@@ -42,8 +42,13 @@ class PokemonType(BaseModel):
     type_name: str
 
 
+class PokemonWithTypes(Pokemon):
+    """Pokemon with types list — used in paginated list responses."""
+    types: List[PokemonType] = []
+
+
 class PokemonDetail(Pokemon):
-    """Pokemon model with relationships."""
+    """Pokemon model with full relationships."""
     abilities: List[PokemonAbility] = []
     types: List[PokemonType] = []
 
@@ -51,6 +56,6 @@ class PokemonDetail(Pokemon):
 class PokemonList(BaseModel):
     """Paginated list of Pokemon."""
     total: int
-    items: List[Pokemon]
+    items: List[PokemonWithTypes]
     page: int
     page_size: int
