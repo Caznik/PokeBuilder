@@ -156,6 +156,10 @@ export interface SavedTeamMember {
   set_name: string | null
   nature: string | null
   ability: string | null
+  item: string | null
+  tera_type: string | null
+  evs: Record<string, number> | null
+  moves: string[] | null
 }
 
 export interface SavedTeamSummary {
@@ -189,4 +193,29 @@ export interface UpdateTeamRequest {
 export interface UpdateMemberRequest {
   pokemon_name: string
   set_id: number
+  item?: string | null
+  tera_type?: string | null
+  evs?: Record<string, number> | null
+  moves?: string[] | null
+  nature?: string | null
+  ability?: string | null
+}
+
+// Move picker
+export interface PokemonMove {
+  id: number
+  name: string
+  power: number | null
+  accuracy: number | null
+  pp: number | null
+  learn_method: string
+  level: number | null
+  category: string | null   // "physical" | "special" | "status"
+  type: string | null
+}
+
+export interface PokemonMovesResponse {
+  pokemon_id: number
+  pokemon_name: string
+  moves: PokemonMove[]
 }
