@@ -67,7 +67,7 @@ def _make_conn(fetchone_return=None, fetchall_return=None, rowcount=1):
 
 class TestSaveTeam:
     def test_returns_saved_team_detail(self):
-        member_rows = [(i, m.pokemon_name, m.set_id, None, None, None) for i, m in enumerate(_MEMBERS)]
+        member_rows = [(i, m.pokemon_name, m.set_id, None, None, None, None, None, None, None) for i, m in enumerate(_MEMBERS)]
         mock_conn, mock_cursor = _make_conn(
             fetchone_return=(1, "My Team", 8.5, _NOW),
             fetchall_return=member_rows,
@@ -97,7 +97,7 @@ class TestSaveTeam:
 
 class TestListTeams:
     def test_returns_list_of_summaries(self):
-        member_rows = [(i, f"pokemon{i}", i + 1, f"set{i}", "jolly", "ability") for i in range(6)]
+        member_rows = [(i, f"pokemon{i}", i + 1, f"set{i}", "jolly", "ability", None, None, None, None) for i in range(6)]
         mock_conn, mock_cursor = _make_conn(
             fetchall_return=[(1, "Team A", 8.5, _NOW), (2, "Team B", 7.0, _NOW)]
         )
@@ -123,12 +123,12 @@ class TestGetTeam:
         analysis_json = _ANALYSIS.model_dump()
         breakdown_json = _BREAKDOWN.model_dump()
         member_rows = [
-            (0, "garchomp",   1, "Choice Scarf", "jolly", "rough-skin"),
-            (1, "ferrothorn", 2, "Defensive",    "relaxed", "iron-barbs"),
-            (2, "rotom-wash", 3, "Defensive",    "bold",    "levitate"),
-            (3, "clefable",   4, "Calm Mind",    "calm",    "magic-guard"),
-            (4, "heatran",    5, "Stealth Rock",  "timid",   "flash-fire"),
-            (5, "landorus",   6, "Scarf",         "jolly",   "intimidate"),
+            (0, "garchomp",   1, "Choice Scarf", "jolly",   "rough-skin", None, None, None, None),
+            (1, "ferrothorn", 2, "Defensive",    "relaxed", "iron-barbs", None, None, None, None),
+            (2, "rotom-wash", 3, "Defensive",    "bold",    "levitate",   None, None, None, None),
+            (3, "clefable",   4, "Calm Mind",    "calm",    "magic-guard",None, None, None, None),
+            (4, "heatran",    5, "Stealth Rock", "timid",   "flash-fire", None, None, None, None),
+            (5, "landorus",   6, "Scarf",        "jolly",   "intimidate", None, None, None, None),
         ]
         mock_conn, mock_cursor = _make_conn()
         mock_cursor.fetchone.return_value = (1, "My Team", 8.5, _NOW, breakdown_json, analysis_json)
@@ -149,7 +149,7 @@ class TestUpdateTeam:
         analysis_json = _ANALYSIS.model_dump()
         breakdown_json = _BREAKDOWN.model_dump()
         member_rows = [
-            (i, f"pokemon{i}", i + 1, None, None, None) for i in range(6)
+            (i, f"pokemon{i}", i + 1, None, None, None, None, None, None, None) for i in range(6)
         ]
         mock_conn, mock_cursor = _make_conn()
         mock_cursor.fetchone.return_value = (1, "New Name", 8.5, _NOW, breakdown_json, analysis_json)
@@ -169,12 +169,12 @@ class TestUpdateMember:
         analysis_dict = _ANALYSIS.model_dump()
         breakdown_dict = _BREAKDOWN.model_dump()
         member_rows = [
-            (0, "rillaboom",  7, "Band",          "adamant", "grassy-surge"),
-            (1, "ferrothorn", 2, "Defensive",      "relaxed", "iron-barbs"),
-            (2, "rotom-wash", 3, "Defensive",      "bold",    "levitate"),
-            (3, "clefable",   4, "Calm Mind",      "calm",    "magic-guard"),
-            (4, "heatran",    5, "Stealth Rock",   "timid",   "flash-fire"),
-            (5, "landorus",   6, "Scarf",          "jolly",   "intimidate"),
+            (0, "rillaboom",  7, "Band",          "adamant", "grassy-surge", None, None, None, None),
+            (1, "ferrothorn", 2, "Defensive",      "relaxed", "iron-barbs",   None, None, None, None),
+            (2, "rotom-wash", 3, "Defensive",      "bold",    "levitate",     None, None, None, None),
+            (3, "clefable",   4, "Calm Mind",      "calm",    "magic-guard",  None, None, None, None),
+            (4, "heatran",    5, "Stealth Rock",   "timid",   "flash-fire",   None, None, None, None),
+            (5, "landorus",   6, "Scarf",          "jolly",   "intimidate",   None, None, None, None),
         ]
         fake_builds = [
             PokemonBuild("rillaboom", 7, ["grass"], "adamant", "grassy-surge", None,
@@ -212,3 +212,28 @@ class TestDeleteTeam:
         mock_conn, mock_cursor = _make_conn(rowcount=0)
         with pytest.raises(ValueError, match="not found"):
             delete_team(mock_conn, 999)
+
+
+def test_load_members_returns_item_and_tera_type():
+    """_load_members maps new columns into SavedTeamMember fields."""
+    from src.api.services.saved_team_service import _load_members
+
+    cur = MagicMock()
+    cur.fetchall.return_value = [
+        # slot, pokemon_name, set_id, set_name, nature, ability,
+        # item, tera_type, evs, moves
+        (0, "garchomp", 1, "Scarfer", "jolly", "rough-skin",
+         "Choice Scarf", "dragon",
+         {"hp": 4, "attack": 252, "defense": 0,
+          "sp_attack": 0, "sp_defense": 0, "speed": 252},
+         ["earthquake", "outrage", "stone-edge", "fire-fang"]),
+    ]
+
+    members = _load_members(cur, team_id=1)
+
+    assert len(members) == 1
+    m = members[0]
+    assert m.item == "Choice Scarf"
+    assert m.tera_type == "dragon"
+    assert m.evs["attack"] == 252
+    assert m.moves == ["earthquake", "outrage", "stone-edge", "fire-fang"]
