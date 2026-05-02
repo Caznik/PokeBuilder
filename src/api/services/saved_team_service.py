@@ -4,11 +4,10 @@
 import json
 from typing import Any
 
-from ..models.saved_team import SavedTeamDetail, SavedTeamMember, SavedTeamSummary
+from ..models.saved_team import SavedTeamDetail, SavedTeamMember, SavedTeamSummary, UpdateMemberRequest
 from ..models.team import CoverageResult, TeamAnalysisResponse, TeamMemberInput
 from ..models.scoring import ScoreBreakdown, ScoreComponent
-from .team_loader import load_build, load_team
-from .team_analysis import analyze_team
+from .team_loader import load_build
 from .team_scorer import score_team
 
 
@@ -233,52 +232,48 @@ def update_member(
     conn: Any,
     team_id: int,
     slot: int,
-    pokemon_name: str,
-    set_id: int,
+    request: UpdateMemberRequest,
 ) -> SavedTeamDetail:
-    """Swap one member slot and re-score the full team.
+    """Patch one member slot's fields without re-scoring the team.
 
     Args:
         conn: Active psycopg2 connection.
         team_id: Primary key of the saved team.
-        slot: Member index 0-5 to replace.
-        pokemon_name: New Pokemon name.
-        set_id: New competitive set id.
+        slot: Member index 0-5 to update.
+        request: UpdateMemberRequest with required pokemon_name/set_id and
+                 optional item, tera_type, evs, moves, nature, ability.
 
     Returns:
-        Updated SavedTeamDetail with fresh score, breakdown, and analysis.
+        Updated SavedTeamDetail.
 
     Raises:
-        ValueError: If no team with that id exists, or the new set_id is invalid.
+        ValueError: If no matching row exists.
     """
+    sets = ["pokemon_name = %s", "set_id = %s"]
+    values: list[Any] = [request.pokemon_name, request.set_id]
+
+    if request.item is not None:
+        sets.append("item = %s"); values.append(request.item)
+    if request.tera_type is not None:
+        sets.append("tera_type = %s"); values.append(request.tera_type)
+    if request.evs is not None:
+        sets.append("evs = %s"); values.append(json.dumps(request.evs))
+    if request.moves is not None:
+        sets.append("moves = %s"); values.append(json.dumps(request.moves))
+    if request.nature is not None:
+        sets.append("nature_override = %s"); values.append(request.nature)
+    if request.ability is not None:
+        sets.append("ability_override = %s"); values.append(request.ability)
+
+    values.extend([team_id, slot])
+
     with conn.cursor() as cur:
         cur.execute(
-            "UPDATE saved_team_members SET pokemon_name = %s, set_id = %s WHERE team_id = %s AND slot = %s",
-            (pokemon_name, set_id, team_id, slot),
+            f"UPDATE saved_team_members SET {', '.join(sets)} WHERE team_id = %s AND slot = %s",
+            values,
         )
         if cur.rowcount == 0:
             raise ValueError(f"Saved team {team_id} not found or slot {slot} invalid")
-
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT slot, pokemon_name, set_id FROM saved_team_members WHERE team_id = %s ORDER BY slot",
-            (team_id,),
-        )
-        rows = cur.fetchall()
-
-    if not rows:
-        raise ValueError(f"Saved team {team_id} not found")
-
-    raw_members = [{"pokemon_name": r[1], "set_id": r[2]} for r in rows]
-    builds = load_team(conn, raw_members)
-    report = analyze_team(builds)
-    scored = score_team(report, builds)
-
-    with conn.cursor() as cur:
-        cur.execute(
-            "UPDATE saved_teams SET score = %s, breakdown = %s, analysis = %s WHERE id = %s",
-            (scored["score"], json.dumps(scored["breakdown"]), json.dumps(report), team_id),
-        )
 
     conn.commit()
     return get_team(conn, team_id)

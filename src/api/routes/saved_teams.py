@@ -94,21 +94,22 @@ def update_team_endpoint(team_id: int, body: UpdateTeamRequest):
 
 @router.patch("/{team_id}/members/{slot}", response_model=SavedTeamDetail)
 def update_member_endpoint(team_id: int, slot: int, body: UpdateMemberRequest):
-    """Swap a single member slot and re-score the team.
+    """Patch a single member slot's fields without re-scoring the team.
 
     Args:
         team_id: Primary key of the saved team.
         slot: Member index 0–5.
-        body: New pokemon_name and set_id.
+        body: Fields to update — pokemon_name and set_id are required;
+              item, tera_type, evs, moves, nature, and ability are optional.
 
     Returns:
-        Updated SavedTeamDetail with fresh score, breakdown, and analysis.
+        Updated SavedTeamDetail.
     """
     if not 0 <= slot <= 5:
         raise HTTPException(status_code=422, detail="slot must be between 0 and 5")
     try:
         with get_db_connection() as conn:
-            return update_member(conn, team_id, slot, body.pokemon_name, body.set_id)
+            return update_member(conn, team_id, slot, body)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 

@@ -178,8 +178,8 @@ class TestUpdateTeam:
 
 
 class TestUpdateMember:
-    def test_updates_slot_and_rescores(self):
-        from src.api.models.team import PokemonBuild, MoveDetail
+    def test_updates_slot_without_rescoring(self):
+        from src.api.models.saved_team import UpdateMemberRequest
         analysis_dict = _ANALYSIS.model_dump()
         breakdown_dict = _BREAKDOWN.model_dump()
         member_rows = [
@@ -190,29 +190,22 @@ class TestUpdateMember:
             (4, "heatran",    5, "Stealth Rock",   "timid",   "flash-fire",   None, None, None, None),
             (5, "landorus",   6, "Scarf",          "jolly",   "intimidate",   None, None, None, None),
         ]
-        fake_builds = [
-            PokemonBuild("rillaboom", 7, ["grass"], "adamant", "grassy-surge", None,
-                         {"hp": 300, "attack": 350, "defense": 200,
-                          "sp_attack": 150, "sp_defense": 200, "speed": 200})
-        ] * 6
 
         mock_conn, mock_cursor = _make_conn()
         mock_cursor.fetchall.return_value = member_rows
         mock_cursor.fetchone.return_value = (1, "My Team", 8.0, _NOW, breakdown_dict, analysis_dict)
 
-        with (
-            patch("src.api.services.saved_team_service.load_team", return_value=fake_builds),
-            patch("src.api.services.saved_team_service.analyze_team", return_value=analysis_dict),
-            patch("src.api.services.saved_team_service.score_team", return_value={"score": 8.0, "breakdown": breakdown_dict}),
-        ):
-            result = update_member(mock_conn, 1, slot=0, pokemon_name="rillaboom", set_id=7)
+        req = UpdateMemberRequest(pokemon_name="rillaboom", set_id=7)
+        result = update_member(mock_conn, 1, slot=0, request=req)
 
         assert isinstance(result, SavedTeamDetail)
 
     def test_raises_value_error_when_team_not_found(self):
+        from src.api.models.saved_team import UpdateMemberRequest
         mock_conn, mock_cursor = _make_conn(fetchone_return=None, rowcount=0)
+        req = UpdateMemberRequest(pokemon_name="rillaboom", set_id=7)
         with pytest.raises(ValueError, match="not found"):
-            update_member(mock_conn, 999, slot=0, pokemon_name="rillaboom", set_id=7)
+            update_member(mock_conn, 999, slot=0, request=req)
 
 
 class TestDeleteTeam:
@@ -292,6 +285,72 @@ def test_save_team_populates_member_detail_columns():
     first_call_sql = str(insert_calls[0])
     assert "item" in first_call_sql
     assert "nature_override" in first_call_sql
+
+
+def test_update_member_patches_item_without_rescoring():
+    """update_member writes override fields and does not call score_team."""
+    from src.api.services.saved_team_service import update_member
+    from src.api.models.saved_team import UpdateMemberRequest, SavedTeamDetail, SavedTeamMember
+    from src.api.models.scoring import ScoreBreakdown, ScoreComponent
+    from src.api.models.team import TeamAnalysisResponse, CoverageResult
+    from datetime import datetime, timezone
+
+    req = UpdateMemberRequest(
+        pokemon_name="garchomp",
+        set_id=1,
+        item="Choice Scarf",
+        tera_type="dragon",
+        evs={"hp": 4, "attack": 252, "defense": 0,
+             "sp_attack": 0, "sp_defense": 0, "speed": 252},
+        moves=["earthquake", "outrage", "stone-edge", "fire-fang"],
+        nature="jolly",
+        ability="rough-skin",
+    )
+
+    _sc = ScoreComponent(score=1.0, reason="test")
+    _bd = ScoreBreakdown(coverage=_sc, defensive=_sc, role=_sc, speed_control=_sc, lead_pair=_sc)
+    _an = TeamAnalysisResponse(
+        valid=True, issues=[], roles={}, weaknesses={}, resistances={},
+        coverage=CoverageResult(covered_types=[], missing_types=[]),
+    )
+    _now = datetime(2026, 5, 2, tzinfo=timezone.utc)
+
+    conn = MagicMock()
+    cur = MagicMock()
+    conn.cursor.return_value.__enter__ = MagicMock(return_value=cur)
+    conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    cur.rowcount = 1
+    cur.fetchone.return_value = (1, "My Team", 8.5, _now,
+                                 _bd.model_dump(), _an.model_dump())
+    cur.fetchall.return_value = [
+        (0, "garchomp", 1, "Scarfer", "jolly", "rough-skin",
+         "Choice Scarf", "dragon",
+         {"hp": 4, "attack": 252, "defense": 0,
+          "sp_attack": 0, "sp_defense": 0, "speed": 252},
+         ["earthquake", "outrage", "stone-edge", "fire-fang"]),
+    ] + [(i, f"poke{i}", i, None, None, None, None, None, None, None) for i in range(1, 6)]
+
+    with patch("src.api.services.saved_team_service.score_team") as mock_score:
+        result = update_member(conn, team_id=1, slot=0, request=req)
+
+    mock_score.assert_not_called()
+    assert isinstance(result, SavedTeamDetail)
+
+
+def test_update_member_raises_on_missing_slot():
+    from src.api.services.saved_team_service import update_member
+    from src.api.models.saved_team import UpdateMemberRequest
+
+    req = UpdateMemberRequest(pokemon_name="pikachu", set_id=99)
+
+    conn = MagicMock()
+    cur = MagicMock()
+    conn.cursor.return_value.__enter__ = MagicMock(return_value=cur)
+    conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    cur.rowcount = 0
+
+    with pytest.raises(ValueError, match="not found"):
+        update_member(conn, team_id=999, slot=0, request=req)
 
 
 def test_load_members_returns_item_and_tera_type():
