@@ -38,9 +38,10 @@ def _load_members(cur: Any, team_id: int) -> list[SavedTeamMember]:
     cur.execute(
         """
         SELECT stm.slot, stm.pokemon_name, stm.set_id,
-               cs.name   AS set_name,
-               n.name    AS nature,
-               a.name    AS ability
+               cs.name AS set_name,
+               COALESCE(stm.nature_override,  n.name) AS nature,
+               COALESCE(stm.ability_override, a.name) AS ability,
+               stm.item, stm.tera_type, stm.evs, stm.moves
         FROM   saved_team_members stm
         LEFT JOIN competitive_sets cs ON stm.set_id   = cs.id
         LEFT JOIN natures           n  ON cs.nature_id  = n.id
@@ -54,6 +55,7 @@ def _load_members(cur: Any, team_id: int) -> list[SavedTeamMember]:
         SavedTeamMember(
             slot=r[0], pokemon_name=r[1], set_id=r[2],
             set_name=r[3], nature=r[4], ability=r[5],
+            item=r[6], tera_type=r[7], evs=r[8], moves=r[9],
         )
         for r in cur.fetchall()
     ]
