@@ -7,7 +7,7 @@ from typing import Any
 from ..models.saved_team import SavedTeamDetail, SavedTeamMember, SavedTeamSummary
 from ..models.team import CoverageResult, TeamAnalysisResponse, TeamMemberInput
 from ..models.scoring import ScoreBreakdown, ScoreComponent
-from .team_loader import load_team
+from .team_loader import load_build, load_team
 from .team_analysis import analyze_team
 from .team_scorer import score_team
 
@@ -82,6 +82,8 @@ def save_team(
     Returns:
         The newly created SavedTeamDetail.
     """
+    builds = [load_build(conn, m.pokemon_name, m.set_id) for m in members]
+
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -94,10 +96,27 @@ def save_team(
         row = cur.fetchone()
         team_id = row[0]
 
-        for slot, member in enumerate(members):
+        for slot, (member, build) in enumerate(zip(members, builds)):
+            move_names = [mv.name for mv in build.moves][:4]
+            while len(move_names) < 4:
+                move_names.append("")
             cur.execute(
-                "INSERT INTO saved_team_members (team_id, slot, pokemon_name, set_id) VALUES (%s, %s, %s, %s)",
-                (team_id, slot, member.pokemon_name, member.set_id),
+                """
+                INSERT INTO saved_team_members
+                    (team_id, slot, pokemon_name, set_id,
+                     item, tera_type, evs, moves,
+                     nature_override, ability_override)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    team_id, slot, member.pokemon_name, member.set_id,
+                    build.item,
+                    None,  # tera_type — no competitive set default
+                    json.dumps(build.evs) if build.evs else None,
+                    json.dumps(move_names),
+                    build.nature,
+                    build.ability,
+                ),
             )
 
     conn.commit()
