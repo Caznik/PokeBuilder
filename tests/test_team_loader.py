@@ -106,6 +106,15 @@ class TestLoadBuild:
         assert len(build.moves) == 4
         assert build.moves[0] == MoveDetail("earthquake", "ground", "physical")
 
+    def test_evs_dict_populated(self):
+        conn, _ = _make_conn(SET_ROW, TYPE_ROWS, MOVE_ROWS)
+        with patch("src.api.services.team_loader.calculate_stats", return_value=COMPUTED_STATS):
+            build = load_build(conn, "garchomp", 1)
+        assert build.evs == {
+            "hp": 0, "attack": 252, "defense": 0,
+            "sp_attack": 0, "sp_defense": 4, "speed": 252,
+        }
+
     def test_raises_if_set_not_found(self):
         conn, _ = _make_conn(set_row=None, type_rows=[], move_rows=[])
         with patch("src.api.services.team_loader.calculate_stats", return_value=COMPUTED_STATS):

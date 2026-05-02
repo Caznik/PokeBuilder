@@ -27,6 +27,7 @@ class PokemonBuild:
     item: Optional[str]
     stats: dict[str, int]   # hp, attack, defense, sp_attack, sp_defense, speed
     moves: list[MoveDetail] = field(default_factory=list)
+    evs: dict[str, int] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------

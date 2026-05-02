@@ -110,6 +110,7 @@ def load_build(conn: Any, pokemon_name: str, set_id: int) -> PokemonBuild:
         item=item,
         stats=stats,
         moves=moves,
+        evs=evs,
     )
 
 
