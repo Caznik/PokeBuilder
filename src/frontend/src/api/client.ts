@@ -16,6 +16,7 @@ import type {
   SaveTeamRequest,
   UpdateTeamRequest,
   UpdateMemberRequest,
+  PokemonMovesResponse,
 } from './types'
 
 const BASE = '/api'
@@ -126,5 +127,10 @@ export const api = {
 
     delete: (id: number): Promise<void> =>
       del(`/saved-teams/${id}`),
+  },
+
+  moves: {
+    forPokemon: (pokemonId: number): Promise<PokemonMovesResponse> =>
+      get<PokemonMovesResponse>(`/moves/pokemon/${pokemonId}/moves`),
   },
 }

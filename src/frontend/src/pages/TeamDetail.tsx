@@ -6,6 +6,7 @@ import ScoreBar from '../components/ScoreBar'
 import BreakdownTable from '../components/BreakdownTable'
 import AnalysisReport from '../components/AnalysisReport'
 import TypeBadge from '../components/TypeBadge'
+import MemberDetailModal from '../components/MemberDetailModal'
 
 function titleCase(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1)
@@ -28,6 +29,8 @@ export default function TeamDetail() {
   const [nameValue, setNameValue] = useState('')
   const [nameSaving, setNameSaving] = useState(false)
   const [nameError, setNameError] = useState<string | null>(null)
+
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -160,10 +163,14 @@ export default function TeamDetail() {
           return (
             <div
               key={m.slot}
+              onClick={() => setSelectedSlot(m.slot)}
               style={{
                 background: 'var(--surface)', border: '1px solid var(--border)',
                 borderRadius: 8, padding: '12px 8px', textAlign: 'center',
+                cursor: 'pointer', transition: 'border-color 0.15s',
               }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)' }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)' }}
             >
               <div style={{
                 width: 80, height: 80, borderRadius: '50%',
@@ -195,6 +202,21 @@ export default function TeamDetail() {
           )
         })}
       </div>
+
+      {selectedSlot !== null && (() => {
+        const selectedMember = team.members.find((m) => m.slot === selectedSlot)
+        const selectedPokemon = selectedMember ? pokemonMap[selectedMember.pokemon_name] : undefined
+        if (!selectedMember || !selectedPokemon) return null
+        return (
+          <MemberDetailModal
+            teamId={team.id}
+            member={selectedMember}
+            pokemon={selectedPokemon}
+            onClose={() => setSelectedSlot(null)}
+            onSaved={(updated) => { setTeam(updated); setSelectedSlot(null) }}
+          />
+        )
+      })()}
 
       <details style={{ marginBottom: 12 }}>
         <summary className="cursor-pointer select-none" style={{ fontSize: 10, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
