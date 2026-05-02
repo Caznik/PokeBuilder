@@ -169,11 +169,12 @@ export default function MemberDetailModal({ teamId, member, pokemon, onClose, on
     return map[key] ?? 0
   }
 
-  // snap=true rounds to nearest multiple of 4 (called onBlur); snap=false allows free typing (called onChange)
-  function setEv(key: string, raw: number, snap = false) {
-    const bounded = Math.max(0, Math.min(252, isNaN(raw) ? 0 : raw))
-    const value = snap ? Math.round(bounded / 4) * 4 : bounded
-    setDraft((d) => ({ ...d, evs: { ...d.evs, [key]: value } }))
+  function setEv(key: string, raw: number) {
+    setDraft((d) => {
+      const remaining = 508 - evTotal(d.evs) + (d.evs[key as keyof typeof d.evs] ?? 0)
+      const value = Math.max(0, Math.min(252, Math.min(remaining, isNaN(raw) ? 0 : raw)))
+      return { ...d, evs: { ...d.evs, [key]: value } }
+    })
   }
 
   const filteredMoves = allMoves.filter((m) =>
@@ -458,24 +459,19 @@ export default function MemberDetailModal({ teamId, member, pokemon, onClose, on
               const labelColor = isPlus ? 'var(--accent)' : isMinus ? 'oklch(0.60 0.18 25)' : 'var(--text-muted)'
 
               return (
-                <div key={key} style={{ display: 'grid', gridTemplateColumns: '32px 1fr 48px 32px', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <div key={key} style={{ display: 'grid', gridTemplateColumns: '32px 1fr 36px 36px', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: labelColor, textTransform: 'uppercase' }}>
                     {STAT_LABELS[key]}{isPlus ? '+' : isMinus ? '−' : ''}
                   </span>
                   <input
-                    type="number"
+                    type="range"
                     min={0}
                     max={252}
                     step={4}
                     value={ev}
-                    onChange={(e) => setEv(key, e.target.value === '' ? 0 : Number(e.target.value))}
-                    onBlur={(e) => setEv(key, Number(e.target.value), true)}
-                    style={{
-                      background: 'var(--surface-2)', border: '1px solid var(--border)',
-                      borderRadius: 3, padding: '2px 6px',
-                      fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text)',
-                      outline: 'none', width: '100%', boxSizing: 'border-box',
-                    }}
+                    disabled={total >= 508 && ev === 0}
+                    onChange={(e) => setEv(key, Number(e.target.value))}
+                    style={{ width: '100%', accentColor: isPlus ? 'oklch(0.85 0.18 130)' : isMinus ? 'oklch(0.60 0.18 25)' : 'var(--accent)', cursor: total >= 508 && ev === 0 ? 'not-allowed' : 'pointer', opacity: total >= 508 && ev === 0 ? 0.35 : 1 }}
                   />
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)', textAlign: 'right' }}>
                     {ev}
