@@ -13,7 +13,7 @@ import json
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
-from src.api.models.team import TeamMemberInput, TeamAnalysisResponse, CoverageResult
+from src.api.models.team import TeamMemberInput, TeamAnalysisResponse, CoverageResult, PokemonBuild
 from src.api.models.scoring import ScoreBreakdown, ScoreComponent
 from src.api.services.saved_team_service import (
     save_team,
@@ -25,6 +25,17 @@ from src.api.services.saved_team_service import (
 )
 
 _NOW = datetime(2026, 4, 30, 12, 0, 0, tzinfo=timezone.utc)
+
+_FAKE_BUILD = PokemonBuild(
+    pokemon_name="garchomp", set_id=1,
+    types=["dragon"], nature="jolly", ability="rough-skin",
+    item="Choice Scarf",
+    stats={"hp": 357, "attack": 333, "defense": 251,
+           "sp_attack": 167, "sp_defense": 206, "speed": 333},
+    moves=[],
+    evs={"hp": 4, "attack": 252, "defense": 0,
+         "sp_attack": 0, "sp_defense": 0, "speed": 252},
+)
 
 _MEMBERS = [
     TeamMemberInput(pokemon_name="garchomp",   set_id=1),
@@ -72,7 +83,8 @@ class TestSaveTeam:
             fetchone_return=(1, "My Team", 8.5, _NOW),
             fetchall_return=member_rows,
         )
-        result = save_team(mock_conn, "My Team", _MEMBERS, 8.5, _BREAKDOWN, _ANALYSIS)
+        with patch("src.api.services.saved_team_service.load_build", return_value=_FAKE_BUILD):
+            result = save_team(mock_conn, "My Team", _MEMBERS, 8.5, _BREAKDOWN, _ANALYSIS)
         assert isinstance(result, SavedTeamDetail)
         assert result.id == 1
         assert result.name == "My Team"
@@ -83,7 +95,8 @@ class TestSaveTeam:
         mock_conn, mock_cursor = _make_conn(
             fetchone_return=(1, "My Team", 8.5, _NOW)
         )
-        save_team(mock_conn, "My Team", _MEMBERS, 8.5, _BREAKDOWN, _ANALYSIS)
+        with patch("src.api.services.saved_team_service.load_build", return_value=_FAKE_BUILD):
+            save_team(mock_conn, "My Team", _MEMBERS, 8.5, _BREAKDOWN, _ANALYSIS)
         # 1 INSERT saved_teams + 6 INSERTs members + 1 SELECT for _load_members
         assert mock_cursor.execute.call_count == 8
 
@@ -91,7 +104,8 @@ class TestSaveTeam:
         mock_conn, mock_cursor = _make_conn(
             fetchone_return=(1, "My Team", 8.5, _NOW)
         )
-        save_team(mock_conn, "My Team", _MEMBERS, 8.5, _BREAKDOWN, _ANALYSIS)
+        with patch("src.api.services.saved_team_service.load_build", return_value=_FAKE_BUILD):
+            save_team(mock_conn, "My Team", _MEMBERS, 8.5, _BREAKDOWN, _ANALYSIS)
         mock_conn.commit.assert_called_once()
 
 
@@ -212,6 +226,72 @@ class TestDeleteTeam:
         mock_conn, mock_cursor = _make_conn(rowcount=0)
         with pytest.raises(ValueError, match="not found"):
             delete_team(mock_conn, 999)
+
+
+def test_save_team_populates_member_detail_columns():
+    """save_team writes item/evs/moves/nature/ability from load_build into new columns."""
+    from src.api.services.saved_team_service import save_team
+    from src.api.models.team import PokemonBuild, MoveDetail, TeamMemberInput
+    from src.api.models.scoring import ScoreBreakdown, ScoreComponent
+    from src.api.models.team import TeamAnalysisResponse, CoverageResult
+    import json
+
+    _sc = ScoreComponent(score=1.0, reason="test")
+    _bd = ScoreBreakdown(
+        coverage=_sc, defensive=_sc, role=_sc,
+        speed_control=_sc, lead_pair=_sc,
+    )
+    _an = TeamAnalysisResponse(
+        valid=True, issues=[], roles={}, weaknesses={}, resistances={},
+        coverage=CoverageResult(covered_types=[], missing_types=[]),
+    )
+
+    members = [TeamMemberInput(pokemon_name=f"poke{i}", set_id=i) for i in range(6)]
+
+    fake_build = PokemonBuild(
+        pokemon_name="poke0", set_id=0,
+        types=["normal"], nature="jolly", ability="keen-eye",
+        item="Choice Scarf",
+        stats={"hp": 300, "attack": 200, "defense": 150,
+               "sp_attack": 100, "sp_defense": 120, "speed": 180},
+        moves=[MoveDetail("tackle", "normal", "physical")],
+        evs={"hp": 4, "attack": 252, "defense": 0,
+             "sp_attack": 0, "sp_defense": 0, "speed": 252},
+    )
+
+    conn = MagicMock()
+    cur = MagicMock()
+    conn.cursor.return_value.__enter__ = MagicMock(return_value=cur)
+    conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    cur.fetchone.side_effect = [(1, "My Team", 8.5, "2026-05-02")]
+    cur.fetchall.return_value = [
+        (i, f"poke{i}", i, None, "jolly", "keen-eye",
+         "Choice Scarf", None,
+         {"hp": 4, "attack": 252, "defense": 0,
+          "sp_attack": 0, "sp_defense": 0, "speed": 252},
+         ["tackle", "", "", ""])
+        for i in range(6)
+    ]
+
+    with patch(
+        "src.api.services.saved_team_service.load_build",
+        return_value=fake_build,
+    ) as mock_load:
+        save_team(conn, "My Team", members, 8.5, _bd, _an)
+
+    # load_build called once per member
+    assert mock_load.call_count == 6
+
+    # Verify the INSERT used the new columns
+    insert_calls = [
+        c for c in cur.execute.call_args_list
+        if "INSERT INTO saved_team_members" in str(c)
+    ]
+    assert len(insert_calls) == 6
+
+    first_call_sql = str(insert_calls[0])
+    assert "item" in first_call_sql
+    assert "nature_override" in first_call_sql
 
 
 def test_load_members_returns_item_and_tera_type():
