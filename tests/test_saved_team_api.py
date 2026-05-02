@@ -180,6 +180,25 @@ class TestUpdateMemberEndpoint:
             )
         assert resp.status_code == 404
 
+    def test_patch_slot_with_full_fields_returns_200(self):
+        full_body = {
+            "pokemon_name": "garchomp",
+            "set_id": 1,
+            "item": "Choice Scarf",
+            "tera_type": "dragon",
+            "evs": {"hp": 4, "attack": 252, "defense": 0,
+                    "sp_attack": 0, "sp_defense": 0, "speed": 252},
+            "moves": ["earthquake", "outrage", "stone-edge", "fire-fang"],
+            "nature": "jolly",
+            "ability": "rough-skin",
+        }
+        with (
+            patch("src.api.routes.saved_teams.get_db_connection", return_value=_mock_db()),
+            patch("src.api.routes.saved_teams.update_member", return_value=_DETAIL),
+        ):
+            resp = client.patch("/saved-teams/1/members/0", json=full_body)
+        assert resp.status_code == 200
+
 
 class TestDeleteEndpoint:
     def test_delete_returns_204(self):

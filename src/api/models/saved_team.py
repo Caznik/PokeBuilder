@@ -55,6 +55,12 @@ class UpdateTeamRequest(BaseModel):
 class UpdateMemberRequest(BaseModel):
     pokemon_name: str
     set_id: int
+    item: str | None = None
+    tera_type: str | None = None
+    evs: dict | None = None
+    moves: list[str] | None = None
+    nature: str | None = None
+    ability: str | None = None
 
 
 class SavedTeamMember(BaseModel):
@@ -64,6 +70,10 @@ class SavedTeamMember(BaseModel):
     set_name: str | None = None
     nature: str | None = None
     ability: str | None = None
+    item: str | None = None
+    tera_type: str | None = None
+    evs: dict | None = None
+    moves: list[str] | None = None
 
 
 class SavedTeamSummary(BaseModel):
