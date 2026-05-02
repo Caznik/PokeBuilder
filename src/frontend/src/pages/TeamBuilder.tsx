@@ -36,6 +36,11 @@ function emptySlot(): SlotState {
   }
 }
 
+const EV_STAT_LABELS: Record<string, string> = {
+  hp: 'HP', attack: 'Atk', defense: 'Def',
+  sp_attack: 'SpA', sp_defense: 'SpD', speed: 'Spe',
+}
+
 function titleCase(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
@@ -422,22 +427,71 @@ export default function TeamBuilder() {
                         ) : slot.sets.length === 0 ? (
                           <p style={{ fontSize: 11, color: 'oklch(0.65 0.14 80)' }}>No sets available.</p>
                         ) : (
-                          <select
-                            value={slot.selectedSetId ?? ''}
-                            onChange={(e) => updateSlot(i, { selectedSetId: Number(e.target.value) })}
-                            style={{
-                              width: '100%', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)',
-                              color: 'var(--text)', borderRadius: 4, padding: '4px 8px',
-                              fontSize: 12, fontFamily: 'var(--font-mono)',
-                            }}
-                          >
-                            <option value="">— pick a set —</option>
-                            {slot.sets.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name ?? 'Unnamed set'} (ID: {s.id})
-                              </option>
-                            ))}
-                          </select>
+                          <>
+                            <select
+                              value={slot.selectedSetId ?? ''}
+                              onChange={(e) => updateSlot(i, { selectedSetId: Number(e.target.value) })}
+                              style={{
+                                width: '100%', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)',
+                                color: 'var(--text)', borderRadius: 4, padding: '4px 8px',
+                                fontSize: 12, fontFamily: 'var(--font-mono)',
+                              }}
+                            >
+                              <option value="">— pick a set —</option>
+                              {slot.sets.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.name ?? 'Unnamed set'}
+                                </option>
+                              ))}
+                            </select>
+                            {slot.selectedSetId !== null && (() => {
+                              const preview = slot.sets.find((s) => s.id === slot.selectedSetId)
+                              if (!preview) return null
+                              const evEntries = Object.entries(preview.evs).filter(([, v]) => v > 0)
+                              return (
+                                <div style={{ marginTop: 10 }}>
+                                  {/* Nature / Ability / Item */}
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                                    {preview.nature && (
+                                      <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--accent)', background: 'oklch(0.85 0.18 130 / 0.12)', border: '1px solid oklch(0.85 0.18 130 / 0.25)', borderRadius: 3, padding: '2px 6px' }}>
+                                        {titleCase(preview.nature)}
+                                      </span>
+                                    )}
+                                    {preview.ability && (
+                                      <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 3, padding: '2px 6px' }}>
+                                        {preview.ability}
+                                      </span>
+                                    )}
+                                    {preview.item && (
+                                      <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'oklch(0.75 0.14 80)', background: 'oklch(0.75 0.14 80 / 0.10)', border: '1px solid oklch(0.75 0.14 80 / 0.25)', borderRadius: 3, padding: '2px 6px' }}>
+                                        {preview.item}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {/* Moves */}
+                                  {preview.moves.length > 0 && (
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, marginBottom: 8 }}>
+                                      {preview.moves.map((m, mi) => (
+                                        <div key={mi} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text)', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 3, padding: '3px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {m}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {/* EVs */}
+                                  {evEntries.length > 0 && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                      {evEntries.map(([stat, val]) => (
+                                        <span key={stat} style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+                                          {val} {EV_STAT_LABELS[stat] ?? stat}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
+                          </>
                         )}
                       </div>
                       <button
