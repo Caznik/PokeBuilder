@@ -17,6 +17,8 @@ import type {
   UpdateTeamRequest,
   UpdateMemberRequest,
   PokemonMovesResponse,
+  Regulation,
+  RegulationDetail,
 } from './types'
 
 const BASE = '/api'
@@ -132,5 +134,25 @@ export const api = {
   moves: {
     forPokemon: (pokemonId: number): Promise<PokemonMovesResponse> =>
       get<PokemonMovesResponse>(`/moves/pokemon/${pokemonId}/moves`),
+  },
+
+  regulations: {
+    list: (): Promise<Regulation[]> =>
+      get<Regulation[]>('/regulations/'),
+
+    get: (id: number): Promise<RegulationDetail> =>
+      get<RegulationDetail>(`/regulations/${id}`),
+
+    create: (name: string, description: string | null, pokemonNames: string[]): Promise<RegulationDetail> =>
+      post<RegulationDetail>('/regulations/', { name, description, pokemon_names: pokemonNames }),
+
+    update: (
+      id: number,
+      fields: { name?: string; description?: string; pokemon_names?: string[] },
+    ): Promise<RegulationDetail> =>
+      patch<RegulationDetail>(`/regulations/${id}`, fields),
+
+    remove: (id: number): Promise<void> =>
+      del(`/regulations/${id}`),
   },
 }

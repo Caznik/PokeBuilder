@@ -10,6 +10,7 @@ from .scoring import ScoreBreakdown
 class GenerationConstraints(BaseModel):
     include: list[str] = []
     exclude: list[str] = []
+    regulation_id: int | None = None
 
 
 class GenerateRequest(BaseModel):

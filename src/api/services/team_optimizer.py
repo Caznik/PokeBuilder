@@ -18,6 +18,7 @@ from .team_generator import (
 from .team_loader import load_build
 from .team_analysis import analyze_team
 from .team_scorer import score_team
+from . import regulation_service
 
 # Type alias
 Chromosome = list[tuple[str, int]]
@@ -291,7 +292,20 @@ def optimize_team(
     generations = min(generations, MAX_GENERATIONS)
 
     pool = _build_pool(conn)
-    _validate_constraints(pool, constraints)
+
+    regulation_name = None
+    if constraints.regulation_id is not None:
+        regulation_name, allowed = regulation_service.get_regulation_info(
+            conn, constraints.regulation_id
+        )
+        for name in constraints.include:
+            if name.lower() not in allowed:
+                raise ValueError(
+                    f"include Pokémon '{name}' is not permitted under the selected regulation"
+                )
+        pool = [e for e in pool if e.pokemon_name.lower() in allowed]
+
+    _validate_constraints(pool, constraints, regulation_name=regulation_name)
     filtered_pool = _apply_constraints(pool, constraints)
 
     population = _seed_population(filtered_pool, conn, rng, population_size)

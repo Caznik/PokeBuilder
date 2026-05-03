@@ -24,6 +24,7 @@ from src.api.services.team_optimizer import (
     TOURNAMENT_K,
 )
 from src.api.services.team_generator import PoolEntry
+from src.api.models.generation import GenerationConstraints
 
 
 # ---------------------------------------------------------------------------
@@ -600,3 +601,95 @@ class TestOptimizeTeam:
             result = optimize_team(mock_conn, population_size=1, generations=2, rng=rng)
         assert isinstance(result, dict)
         assert "best_teams" in result
+
+
+# ---------------------------------------------------------------------------
+# optimize_team regulation integration
+# ---------------------------------------------------------------------------
+
+class TestOptimizeTeamWithRegulation:
+    def _pool(self, n=20):
+        return [PoolEntry(f"poke{i}", i, None, "fire") for i in range(1, n + 1)]
+
+    def _members(self):
+        return [
+            {"pokemon_name": f"poke{i}", "set_id": i, "set_name": None}
+            for i in range(1, 7)
+        ]
+
+    def _mock_analysis(self):
+        return {
+            "valid": True, "issues": [], "roles": {}, "weaknesses": {},
+            "resistances": {}, "coverage": {"covered_types": [], "missing_types": []},
+        }
+
+    def _mock_scoring(self):
+        return {
+            "score": 7.0,
+            "breakdown": {
+                "coverage": {"score": 1.0, "reason": "ok"},
+                "defensive": {"score": 1.0, "reason": "ok"},
+                "role": {"score": 1.0, "reason": "ok"},
+                "speed": {"score": 1.0, "reason": "ok"},
+            },
+        }
+
+    def test_regulation_id_calls_get_regulation_info(self):
+        allowed_names = {f"poke{i}" for i in range(1, 21)}
+        with (
+            patch("src.api.services.team_optimizer.regulation_service.get_regulation_info",
+                  return_value=("Reg E", allowed_names)) as mock_info,
+            patch("src.api.services.team_optimizer._build_pool",
+                  return_value=self._pool()),
+            patch("src.api.services.team_optimizer._validate_constraints"),
+            patch("src.api.services.team_optimizer._apply_constraints",
+                  return_value=self._pool()),
+            patch("src.api.services.team_optimizer._sample_candidate") as mock_sc,
+            patch("src.api.services.team_optimizer.analyze_team",
+                  return_value=self._mock_analysis()),
+            patch("src.api.services.team_optimizer._is_acceptable", return_value=True),
+            patch("src.api.services.team_optimizer.load_build", return_value=MagicMock()),
+            patch("src.api.services.team_optimizer.score_team",
+                  return_value=self._mock_scoring()),
+        ):
+            mock_sc.return_value = (self._members(), [MagicMock()] * 6)
+            conn = MagicMock()
+            constraints = GenerationConstraints(regulation_id=1)
+            optimize_team(conn, constraints=constraints, population_size=3, generations=1,
+                          rng=random.Random(42))
+            mock_info.assert_called_once_with(conn, 1)
+
+    def test_include_banned_by_regulation_raises(self):
+        allowed_names = {"bulbasaur", "charmander"}
+        with (
+            patch("src.api.services.team_optimizer._build_pool",
+                  return_value=[PoolEntry("bulbasaur", 1, None, "grass")]),
+            patch("src.api.services.team_optimizer.regulation_service.get_regulation_info",
+                  return_value=("Reg E", allowed_names)),
+        ):
+            conn = MagicMock()
+            constraints = GenerationConstraints(include=["mewtwo"], regulation_id=1)
+            with pytest.raises(ValueError, match="not permitted under the selected regulation"):
+                optimize_team(conn, constraints=constraints)
+
+    def test_no_regulation_id_skips_regulation_check(self):
+        with (
+            patch("src.api.services.team_optimizer._build_pool",
+                  return_value=self._pool()),
+            patch("src.api.services.team_optimizer.regulation_service.get_regulation_info") as mock_info,
+            patch("src.api.services.team_optimizer._validate_constraints"),
+            patch("src.api.services.team_optimizer._apply_constraints",
+                  return_value=self._pool()),
+            patch("src.api.services.team_optimizer._sample_candidate") as mock_sc,
+            patch("src.api.services.team_optimizer.analyze_team",
+                  return_value=self._mock_analysis()),
+            patch("src.api.services.team_optimizer._is_acceptable", return_value=True),
+            patch("src.api.services.team_optimizer.load_build", return_value=MagicMock()),
+            patch("src.api.services.team_optimizer.score_team",
+                  return_value=self._mock_scoring()),
+        ):
+            mock_sc.return_value = (self._members(), [MagicMock()] * 6)
+            conn = MagicMock()
+            optimize_team(conn, constraints=GenerationConstraints(),
+                          population_size=3, generations=1, rng=random.Random(42))
+            mock_info.assert_not_called()

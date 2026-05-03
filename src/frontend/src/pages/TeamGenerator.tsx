@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '../api/client'
-import type { GenerationResponse, GenerationConstraints, TeamResult } from '../api/types'
+import type { GenerationResponse, GenerationConstraints, TeamResult, Regulation } from '../api/types'
 import TeamResultCard from '../components/TeamResultCard'
 import PokemonTagInput from '../components/PokemonTagInput'
 
@@ -11,9 +11,17 @@ function parseNames(input: string): string[] {
 export default function TeamGenerator() {
   const [includeInput, setIncludeInput] = useState('')
   const [excludeInput, setExcludeInput] = useState('')
+  const [regulationId, setRegulationId] = useState<number | null>(null)
+  const [regulations, setRegulations] = useState<Regulation[]>([])
   const [result, setResult] = useState<GenerationResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.regulations.list()
+      .then(setRegulations)
+      .catch(() => { /* silently degrade — hide dropdown */ })
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -23,11 +31,15 @@ export default function TeamGenerator() {
 
     const include = parseNames(includeInput)
     const exclude = parseNames(excludeInput)
-    const constraints: GenerationConstraints | undefined =
-      include.length > 0 || exclude.length > 0 ? { include, exclude } : undefined
+    const constraints: GenerationConstraints = { include, exclude }
+    if (regulationId !== null) constraints.regulation_id = regulationId
 
     try {
-      const res = await api.team.generate(constraints)
+      const res = await api.team.generate(
+        include.length > 0 || exclude.length > 0 || regulationId !== null
+          ? constraints
+          : undefined
+      )
       setResult(res)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Unknown error')
@@ -55,6 +67,22 @@ export default function TeamGenerator() {
       <h1 className="text-xl font-bold mb-4">Team Generator</h1>
 
       <form onSubmit={handleSubmit} className="rounded-lg p-4 mb-6 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+        {regulations.length > 0 && (
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Format / Regulation</label>
+            <select
+              value={regulationId ?? ''}
+              onChange={(e) => setRegulationId(e.target.value === '' ? null : Number(e.target.value))}
+              className="w-full text-sm rounded px-3 py-2"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', colorScheme: 'dark' }}
+            >
+              <option value="">No regulation (all Pokémon)</option>
+              {regulations.map((r) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <PokemonTagInput
           label="Include Pokémon (comma-separated)"
           value={includeInput}

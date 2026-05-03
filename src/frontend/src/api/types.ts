@@ -133,6 +133,7 @@ export interface TeamResult {
 export interface GenerationConstraints {
   include: string[]
   exclude: string[]
+  regulation_id?: number
 }
 
 export interface GenerationResponse {
@@ -218,4 +219,15 @@ export interface PokemonMovesResponse {
   pokemon_id: number
   pokemon_name: string
   moves: PokemonMove[]
+}
+
+// Regulations
+export interface Regulation {
+  id: number
+  name: string
+  description: string | null
+}
+
+export interface RegulationDetail extends Regulation {
+  pokemon: string[]
 }

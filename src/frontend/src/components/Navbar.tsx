@@ -5,6 +5,7 @@ const links = [
   { to: '/generate', label: 'Generator' },
   { to: '/optimize', label: 'Optimizer' },
   { to: '/teams', label: 'Teams' },
+  { to: '/regulations', label: 'Regulations' },
 ]
 
 export default function Navbar() {
