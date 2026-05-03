@@ -5,6 +5,7 @@ import TeamGenerator from './pages/TeamGenerator'
 import TeamOptimizer from './pages/TeamOptimizer'
 import Teams from './pages/Teams'
 import TeamDetail from './pages/TeamDetail'
+import Regulations from './pages/Regulations'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/optimize" element={<TeamOptimizer />} />
           <Route path="/teams" element={<Teams />} />
           <Route path="/teams/:id" element={<TeamDetail />} />
+          <Route path="/regulations" element={<Regulations />} />
           <Route path="/build" element={<Navigate to="/teams" replace />} />
           <Route path="/analyze" element={<Navigate to="/teams" replace />} />
           <Route path="/saved" element={<Navigate to="/teams?tab=saved" replace />} />

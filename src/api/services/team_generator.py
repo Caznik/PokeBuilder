@@ -11,6 +11,7 @@ from .team_loader import load_build
 from .team_analysis import analyze_team
 from .role_service import detect_roles
 from .team_scorer import score_team, compute_lead_pair_score
+from . import regulation_service
 
 MAX_RESULTS = 5
 MAX_ITERATIONS = 100
@@ -90,12 +91,14 @@ def _apply_constraints(
 def _validate_constraints(
     pool: list[PoolEntry],
     constraints: GenerationConstraints,
+    regulation_name: str | None = None,
 ) -> None:
     """Assert that the given constraints are satisfiable against the pool.
 
     Args:
-        pool: Full (unfiltered) pool.
+        pool: Pool after regulation filter (if any) but before exclude filter.
         constraints: Constraints to validate.
+        regulation_name: Name of the active regulation, used in error messages.
 
     Raises:
         ValueError: If an include name has no competitive set, or if the pool
@@ -111,6 +114,11 @@ def _validate_constraints(
 
     distinct = {e.pokemon_name for e in filtered}
     if len(distinct) < 6:
+        if regulation_name is not None:
+            raise ValueError(
+                f"Pool has only {len(distinct)} distinct Pokémon after applying "
+                f"{regulation_name} and exclusions (need at least 6)"
+            )
         raise ValueError(
             f"Pool has only {len(distinct)} distinct Pokémon after exclusions "
             f"(need at least 6)"
@@ -299,7 +307,20 @@ def generate_teams(
         constraints = GenerationConstraints()
 
     pool = _build_pool(conn)
-    _validate_constraints(pool, constraints)
+
+    regulation_name = None
+    if constraints.regulation_id is not None:
+        regulation_name, allowed = regulation_service.get_regulation_info(
+            conn, constraints.regulation_id
+        )
+        for name in constraints.include:
+            if name.lower() not in allowed:
+                raise ValueError(
+                    f"include Pokémon '{name}' is not permitted under the selected regulation"
+                )
+        pool = [e for e in pool if e.pokemon_name.lower() in allowed]
+
+    _validate_constraints(pool, constraints, regulation_name=regulation_name)
     filtered_pool = _apply_constraints(pool, constraints)
 
     results: list[dict] = []

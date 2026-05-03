@@ -640,3 +640,95 @@ class TestVGCHeuristics:
         ):
             result = generate_teams(mock_conn, rng=rng)
         assert result["valid_found"] > 0
+
+
+# ---------------------------------------------------------------------------
+# Regulation integration tests
+# ---------------------------------------------------------------------------
+
+class TestValidateConstraintsWithRegulation:
+    def test_regulation_name_in_pool_too_small_error(self):
+        pool = _pool("pikachu", "bulbasaur")  # only 2 distinct
+        constraints = GenerationConstraints(include=[], exclude=[])
+        with pytest.raises(ValueError) as exc_info:
+            _validate_constraints(pool, constraints, regulation_name="Reg E")
+        assert "Reg E" in str(exc_info.value)
+
+    def test_no_regulation_name_gives_original_error(self):
+        pool = _pool("pikachu", "bulbasaur")
+        constraints = GenerationConstraints(include=[], exclude=[])
+        with pytest.raises(ValueError) as exc_info:
+            _validate_constraints(pool, constraints)
+        assert "Reg E" not in str(exc_info.value)
+        assert "exclusions" in str(exc_info.value)
+
+
+class TestGenerateTeamsWithRegulation:
+    def _make_pool(self, n=20):
+        return [PoolEntry(f"poke{i}", i, None, "fire") for i in range(1, n + 1)]
+
+    def _mock_members(self):
+        return [
+            {"pokemon_name": f"poke{i}", "set_id": i, "set_name": None,
+             "nature": "bold", "ability": "blaze"}
+            for i in range(1, 7)
+        ]
+
+    def test_regulation_id_filters_pool(self):
+        allowed_names = {f"poke{i}" for i in range(1, 21)}
+        with (
+            patch("src.api.services.team_generator.regulation_service.get_regulation_info",
+                  return_value=("Reg E", allowed_names)) as mock_info,
+            patch("src.api.services.team_generator._build_pool",
+                  return_value=self._make_pool()),
+            patch("src.api.services.team_generator._sample_candidate") as mock_sc,
+            patch("src.api.services.team_generator.analyze_team",
+                  return_value={"valid": True, "weaknesses": {}, "issues": [],
+                                "roles": {}, "resistances": {},
+                                "coverage": {"covered_types": [], "missing_types": []},
+                                "speed_control_archetype": "none"}),
+            patch("src.api.services.team_generator.score_team",
+                  return_value={"score": 8.0, "breakdown": {}}),
+            patch("src.api.services.team_generator.compute_lead_pair_score",
+                  return_value={"score": 1.0}),
+        ):
+            mock_sc.return_value = (self._mock_members(), [MagicMock()] * 6)
+            conn = MagicMock()
+            constraints = GenerationConstraints(regulation_id=1)
+            generate_teams(conn, constraints)
+            mock_info.assert_called_once_with(conn, 1)
+
+    def test_include_banned_by_regulation_raises_value_error(self):
+        allowed_names = {"bulbasaur", "charmander"}
+        with (
+            patch("src.api.services.team_generator._build_pool",
+                  return_value=_pool("bulbasaur", "charmander")),
+            patch("src.api.services.team_generator.regulation_service.get_regulation_info",
+                  return_value=("Reg E", allowed_names)),
+        ):
+            conn = MagicMock()
+            constraints = GenerationConstraints(include=["mewtwo"], regulation_id=1)
+            with pytest.raises(ValueError, match="not permitted under the selected regulation"):
+                generate_teams(conn, constraints)
+
+    def test_no_regulation_id_skips_regulation_filter(self):
+        with (
+            patch("src.api.services.team_generator._build_pool",
+                  return_value=self._make_pool()),
+            patch("src.api.services.team_generator.regulation_service.get_regulation_info") as mock_info,
+            patch("src.api.services.team_generator._sample_candidate") as mock_sc,
+            patch("src.api.services.team_generator.analyze_team",
+                  return_value={"valid": True, "weaknesses": {}, "issues": [],
+                                "roles": {}, "resistances": {},
+                                "coverage": {"covered_types": [], "missing_types": []},
+                                "speed_control_archetype": "none"}),
+            patch("src.api.services.team_generator.score_team",
+                  return_value={"score": 8.0, "breakdown": {}}),
+            patch("src.api.services.team_generator.compute_lead_pair_score",
+                  return_value={"score": 1.0}),
+        ):
+            mock_sc.return_value = (self._mock_members(), [MagicMock()] * 6)
+            conn = MagicMock()
+            constraints = GenerationConstraints()  # no regulation_id
+            generate_teams(conn, constraints)
+            mock_info.assert_not_called()

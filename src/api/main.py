@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routes import (
     pokemon_router, ability_router, type_router, move_router, stat_router,
     competitive_router, team_router, generation_router, scoring_router,
-    optimization_router, saved_teams_router,
+    optimization_router, saved_teams_router, regulation_router,
 )
 
 app = FastAPI(
@@ -36,6 +36,7 @@ app.include_router(generation_router)
 app.include_router(scoring_router)
 app.include_router(optimization_router)
 app.include_router(saved_teams_router)
+app.include_router(regulation_router)
 
 
 @app.get("/")
@@ -52,6 +53,7 @@ def root():
             "moves": "/moves",
             "competitive-sets": "/competitive-sets",
             "team": "/team",
+            "regulations": "/regulations",
         }
     }
 
