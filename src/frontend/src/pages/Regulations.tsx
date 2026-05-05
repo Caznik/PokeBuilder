@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 import type { Regulation, RegulationDetail } from '../api/types'
+import PokemonDetailModal from '../components/PokemonDetailModal'
 
 function spriteUrl(name: string) {
   return `https://img.pokemondb.net/sprites/home/normal/${name}.png`
@@ -12,6 +13,7 @@ export default function Regulations() {
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedPokemon, setSelectedPokemon] = useState<string | null>(null)
 
   useEffect(() => {
     api.regulations.list()
@@ -24,6 +26,7 @@ export default function Regulations() {
   }, [])
 
   function fetchDetail(id: number) {
+    setSelectedPokemon(null)
     setDetailLoading(true)
     api.regulations.get(id)
       .then(setSelected)
@@ -97,8 +100,9 @@ export default function Regulations() {
                 {selected.pokemon.map((name) => (
                   <div
                     key={name}
-                    className="flex flex-col items-center gap-1 rounded-lg p-2"
+                    className="flex flex-col items-center gap-1 rounded-lg p-2 cursor-pointer transition-colors hover:bg-white/10"
                     style={{ background: 'var(--surface-2)' }}
+                    onClick={() => setSelectedPokemon(name)}
                   >
                     <img
                       src={spriteUrl(name)}
@@ -119,6 +123,11 @@ export default function Regulations() {
           )}
         </div>
       </div>
+
+      <PokemonDetailModal
+        pokemonName={selectedPokemon}
+        onClose={() => setSelectedPokemon(null)}
+      />
     </div>
   )
 }
