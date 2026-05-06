@@ -693,3 +693,88 @@ class TestOptimizeTeamWithRegulation:
             optimize_team(conn, constraints=GenerationConstraints(),
                           population_size=3, generations=1, rng=random.Random(42))
             mock_info.assert_not_called()
+
+    def test_vgc_regulation_passes_format_filter(self):
+        """When regulation name contains VGC, _build_pool is called with format_filter=VGC."""
+        allowed_names = {f"poke{i}" for i in range(1, 21)}
+        with (
+            patch("src.api.services.team_optimizer.regulation_service.get_regulation_info",
+                  return_value=("VGC 2025 Reg G", allowed_names)),
+            patch("src.api.services.team_optimizer._build_pool",
+                  return_value=self._pool()) as mock_build_pool,
+            patch("src.api.services.team_optimizer._validate_constraints"),
+            patch("src.api.services.team_optimizer._apply_constraints",
+                  return_value=self._pool()),
+            patch("src.api.services.team_optimizer._sample_candidate") as mock_sc,
+            patch("src.api.services.team_optimizer.analyze_team",
+                  return_value=self._mock_analysis()),
+            patch("src.api.services.team_optimizer._is_acceptable", return_value=True),
+            patch("src.api.services.team_optimizer.load_build", return_value=MagicMock()),
+            patch("src.api.services.team_optimizer.score_team",
+                  return_value=self._mock_scoring()),
+        ):
+            mock_sc.return_value = (self._members(), [MagicMock()] * 6)
+            conn = MagicMock()
+            constraints = GenerationConstraints(regulation_id=1)
+            optimize_team(conn, constraints=constraints, population_size=3,
+                          generations=1, rng=random.Random(42))
+            mock_build_pool.assert_called_once_with(conn, format_filter="VGC")
+
+    def test_non_vgc_regulation_passes_no_format_filter(self):
+        """When regulation name does not contain VGC, _build_pool is called with format_filter=None."""
+        allowed_names = {f"poke{i}" for i in range(1, 21)}
+        with (
+            patch("src.api.services.team_optimizer.regulation_service.get_regulation_info",
+                  return_value=("Reg E", allowed_names)),
+            patch("src.api.services.team_optimizer._build_pool",
+                  return_value=self._pool()) as mock_build_pool,
+            patch("src.api.services.team_optimizer._validate_constraints"),
+            patch("src.api.services.team_optimizer._apply_constraints",
+                  return_value=self._pool()),
+            patch("src.api.services.team_optimizer._sample_candidate") as mock_sc,
+            patch("src.api.services.team_optimizer.analyze_team",
+                  return_value=self._mock_analysis()),
+            patch("src.api.services.team_optimizer._is_acceptable", return_value=True),
+            patch("src.api.services.team_optimizer.load_build", return_value=MagicMock()),
+            patch("src.api.services.team_optimizer.score_team",
+                  return_value=self._mock_scoring()),
+        ):
+            mock_sc.return_value = (self._members(), [MagicMock()] * 6)
+            conn = MagicMock()
+            constraints = GenerationConstraints(regulation_id=1)
+            optimize_team(conn, constraints=constraints, population_size=3,
+                          generations=1, rng=random.Random(42))
+            mock_build_pool.assert_called_once_with(conn, format_filter=None)
+
+    def test_vgc_format_filter_fallback_when_pool_too_small(self):
+        """When VGC-filtered pool has <6 distinct Pokemon, fall back to format_filter=None."""
+        allowed_names = {f"poke{i}" for i in range(1, 21)}
+        small_pool = [PoolEntry(f"poke{i}", i, None, "fire") for i in range(1, 4)]
+        full_pool = self._pool()
+        with (
+            patch("src.api.services.team_optimizer.regulation_service.get_regulation_info",
+                  return_value=("VGC 2025 Reg G", allowed_names)),
+            patch("src.api.services.team_optimizer._build_pool",
+                  side_effect=[small_pool, full_pool]) as mock_build_pool,
+            patch("src.api.services.team_optimizer._validate_constraints"),
+            patch("src.api.services.team_optimizer._apply_constraints",
+                  return_value=full_pool),
+            patch("src.api.services.team_optimizer._sample_candidate") as mock_sc,
+            patch("src.api.services.team_optimizer.analyze_team",
+                  return_value=self._mock_analysis()),
+            patch("src.api.services.team_optimizer._is_acceptable", return_value=True),
+            patch("src.api.services.team_optimizer.load_build", return_value=MagicMock()),
+            patch("src.api.services.team_optimizer.score_team",
+                  return_value=self._mock_scoring()),
+        ):
+            import warnings
+            mock_sc.return_value = (self._members(), [MagicMock()] * 6)
+            conn = MagicMock()
+            constraints = GenerationConstraints(regulation_id=1)
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                optimize_team(conn, constraints=constraints, population_size=3,
+                              generations=1, rng=random.Random(42))
+            assert mock_build_pool.call_count == 2
+            second_call_kwargs = mock_build_pool.call_args_list[1]
+            assert second_call_kwargs == ((conn,), {"format_filter": None})

@@ -1,0 +1,11 @@
+[
+  {
+    "id": 1,
+    "name": "My Test Team",
+    "score": 72.5,
+    "created_at": "2026-01-01T00:00:00Z",
+    "members": [
+      { "slot": 1, "pokemon_name": "pikachu", "set_id": 1, "set_name": "Standard Pikachu", "nature": "Timid", "ability": "Static", "item": "Light Ball", "tera_type": null, "evs": null, "moves": null }
+    ]
+  }
+]

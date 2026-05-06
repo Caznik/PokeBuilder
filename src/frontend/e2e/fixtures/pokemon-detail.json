@@ -1,0 +1,13 @@
+{
+  "id": 25,
+  "name": "pikachu",
+  "generation": 1,
+  "base_hp": 35,
+  "base_attack": 55,
+  "base_defense": 40,
+  "base_sp_attack": 50,
+  "base_sp_defense": 50,
+  "base_speed": 90,
+  "abilities": [{ "ability_id": 9, "ability_name": "static", "is_hidden": false }],
+  "types": [{ "type_id": 13, "type_name": "electric" }]
+}

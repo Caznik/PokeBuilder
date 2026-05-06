@@ -1,0 +1,9 @@
+{
+  "total": 2,
+  "page": 1,
+  "page_size": 20,
+  "items": [
+    { "id": 25, "name": "pikachu", "generation": 1, "base_hp": 35, "base_attack": 55, "base_defense": 40, "base_sp_attack": 50, "base_sp_defense": 50, "base_speed": 90, "types": [{ "type_id": 13, "type_name": "electric" }] },
+    { "id": 6, "name": "charizard", "generation": 1, "base_hp": 78, "base_attack": 84, "base_defense": 78, "base_sp_attack": 109, "base_sp_defense": 85, "base_speed": 100, "types": [{ "type_id": 10, "type_name": "fire" }, { "type_id": 3, "type_name": "flying" }] }
+  ]
+}

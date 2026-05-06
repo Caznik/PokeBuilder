@@ -13,4 +13,11 @@ export default defineConfig({
       },
     },
   },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/__tests__/setup.ts'],
+    pool: 'vmThreads',
+    passWithNoTests: true,
+    exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**'],
+  },
 })

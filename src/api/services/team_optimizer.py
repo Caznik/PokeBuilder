@@ -1,8 +1,12 @@
 # src/api/services/team_optimizer.py
 """Genetic Algorithm engine for evolving competitive Pokémon teams."""
 
+import logging
 import random
 from typing import Any
+
+_LOG = logging.getLogger(__name__)
+_MIN_POOL_DISTINCT = 6
 
 from ..models.generation import GenerationConstraints
 from .team_generator import (
@@ -291,9 +295,10 @@ def optimize_team(
     population_size = min(population_size, MAX_POPULATION_SIZE)
     generations = min(generations, MAX_GENERATIONS)
 
-    pool = _build_pool(conn)
-
     regulation_name = None
+    allowed: set[str] | None = None
+    format_filter: str | None = None
+
     if constraints.regulation_id is not None:
         regulation_name, allowed = regulation_service.get_regulation_info(
             conn, constraints.regulation_id
@@ -303,6 +308,21 @@ def optimize_team(
                 raise ValueError(
                     f"include Pokémon '{name}' is not permitted under the selected regulation"
                 )
+        if "vgc" in regulation_name.lower():
+            format_filter = "VGC"
+
+    pool = _build_pool(conn, format_filter=format_filter)
+
+    if format_filter is not None:
+        distinct = {e.pokemon_name for e in pool}
+        if len(distinct) < _MIN_POOL_DISTINCT:
+            _LOG.warning(
+                "VGC format filter returned only %d distinct Pokémon; "                "falling back to full pool",
+                len(distinct),
+            )
+            pool = _build_pool(conn, format_filter=None)
+
+    if allowed is not None:
         pool = [e for e in pool if e.pokemon_name.lower() in allowed]
 
     _validate_constraints(pool, constraints, regulation_name=regulation_name)

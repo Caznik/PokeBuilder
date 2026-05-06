@@ -125,6 +125,31 @@ class TestBuildPool:
         pool = _build_pool(conn)
         assert pool == [PoolEntry("ditto", 5, None, None)]
 
+    def test_format_filter_none_returns_all(self):
+        """format_filter=None (default) returns all rows regardless of format."""
+        conn = self._make_conn([
+            ("garchomp", 1, "Choice Scarf", "dragon"),
+            ("ferrothorn", 2, "Defensive", "grass"),
+        ])
+        pool = _build_pool(conn, format_filter=None)
+        assert len(pool) == 2
+
+    def test_format_filter_executes_ilike_query(self):
+        """format_filter='VGC' causes an ILIKE clause with '%VGC%' to be executed."""
+        conn = self._make_conn([("garchomp", 1, "VGC Scarf", "dragon")])
+        cur = conn.cursor.return_value.__enter__.return_value
+        _build_pool(conn, format_filter="VGC")
+        executed_sql = cur.execute.call_args[0][0]
+        assert "ILIKE" in executed_sql.upper()
+        executed_params = cur.execute.call_args[0][1]
+        assert "%VGC%" in executed_params
+
+    def test_format_filter_empty_result(self):
+        """If no sets match the filter, return an empty list."""
+        conn = self._make_conn([])
+        pool = _build_pool(conn, format_filter="VGC")
+        assert pool == []
+
 
 # ---------------------------------------------------------------------------
 # _apply_constraints
@@ -732,3 +757,87 @@ class TestGenerateTeamsWithRegulation:
             constraints = GenerationConstraints()  # no regulation_id
             generate_teams(conn, constraints)
             mock_info.assert_not_called()
+
+    def test_vgc_regulation_passes_format_filter(self):
+        """When regulation name contains VGC, _build_pool is called with format_filter=VGC."""
+        allowed_names = {f"poke{i}" for i in range(1, 21)}
+        with (
+            patch("src.api.services.team_generator.regulation_service.get_regulation_info",
+                  return_value=("VGC 2025 Reg G", allowed_names)),
+            patch("src.api.services.team_generator._build_pool",
+                  return_value=self._make_pool()) as mock_build_pool,
+            patch("src.api.services.team_generator._sample_candidate") as mock_sc,
+            patch("src.api.services.team_generator.analyze_team",
+                  return_value={"valid": True, "weaknesses": {}, "issues": [],
+                                "roles": {}, "resistances": {},
+                                "coverage": {"covered_types": [], "missing_types": []},
+                                "speed_control_archetype": "none"}),
+            patch("src.api.services.team_generator.score_team",
+                  return_value={"score": 8.0, "breakdown": {}}),
+            patch("src.api.services.team_generator.compute_lead_pair_score",
+                  return_value={"score": 1.0}),
+        ):
+            mock_sc.return_value = (self._mock_members(), [MagicMock()] * 6)
+            conn = MagicMock()
+            constraints = GenerationConstraints(regulation_id=1)
+            generate_teams(conn, constraints)
+            mock_build_pool.assert_called_once_with(conn, format_filter="VGC")
+
+    def test_non_vgc_regulation_passes_no_format_filter(self):
+        """When regulation name does not contain VGC, _build_pool is called with format_filter=None."""
+        allowed_names = {f"poke{i}" for i in range(1, 21)}
+        with (
+            patch("src.api.services.team_generator.regulation_service.get_regulation_info",
+                  return_value=("Reg E", allowed_names)),
+            patch("src.api.services.team_generator._build_pool",
+                  return_value=self._make_pool()) as mock_build_pool,
+            patch("src.api.services.team_generator._sample_candidate") as mock_sc,
+            patch("src.api.services.team_generator.analyze_team",
+                  return_value={"valid": True, "weaknesses": {}, "issues": [],
+                                "roles": {}, "resistances": {},
+                                "coverage": {"covered_types": [], "missing_types": []},
+                                "speed_control_archetype": "none"}),
+            patch("src.api.services.team_generator.score_team",
+                  return_value={"score": 8.0, "breakdown": {}}),
+            patch("src.api.services.team_generator.compute_lead_pair_score",
+                  return_value={"score": 1.0}),
+        ):
+            mock_sc.return_value = (self._mock_members(), [MagicMock()] * 6)
+            conn = MagicMock()
+            constraints = GenerationConstraints(regulation_id=1)
+            generate_teams(conn, constraints)
+            mock_build_pool.assert_called_once_with(conn, format_filter=None)
+
+    def test_vgc_format_filter_fallback_when_pool_too_small(self):
+        """When VGC-filtered pool has <6 distinct Pokemon, fall back to format_filter=None."""
+        allowed_names = {f"poke{i}" for i in range(1, 21)}
+        # First call (format_filter=VGC) returns only 3 pokemon; second call (None) returns 20
+        small_pool = [PoolEntry(f"poke{i}", i, None, "fire") for i in range(1, 4)]
+        full_pool = self._make_pool()
+        with (
+            patch("src.api.services.team_generator.regulation_service.get_regulation_info",
+                  return_value=("VGC 2025 Reg G", allowed_names)),
+            patch("src.api.services.team_generator._build_pool",
+                  side_effect=[small_pool, full_pool]) as mock_build_pool,
+            patch("src.api.services.team_generator._sample_candidate") as mock_sc,
+            patch("src.api.services.team_generator.analyze_team",
+                  return_value={"valid": True, "weaknesses": {}, "issues": [],
+                                "roles": {}, "resistances": {},
+                                "coverage": {"covered_types": [], "missing_types": []},
+                                "speed_control_archetype": "none"}),
+            patch("src.api.services.team_generator.score_team",
+                  return_value={"score": 8.0, "breakdown": {}}),
+            patch("src.api.services.team_generator.compute_lead_pair_score",
+                  return_value={"score": 1.0}),
+        ):
+            import warnings
+            mock_sc.return_value = (self._mock_members(), [MagicMock()] * 6)
+            conn = MagicMock()
+            constraints = GenerationConstraints(regulation_id=1)
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                generate_teams(conn, constraints)
+            # Second call should be with format_filter=None (fallback)
+            assert mock_build_pool.call_count == 2
+            second_call_kwargs = mock_build_pool.call_args_list[1]
+            assert second_call_kwargs == ((conn,), {"format_filter": None})

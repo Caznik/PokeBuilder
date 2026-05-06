@@ -176,7 +176,10 @@ def _extract_movesets(dex_settings: dict) -> list[dict]:
 
     movesets = []
     for strategy in strategies:
+        fmt = strategy.get("format", None)
         for ms in strategy.get("movesets", []):
+            ms = dict(ms)
+            ms["format"] = fmt
             movesets.append(ms)
     return movesets
 
@@ -238,14 +241,15 @@ def _store_movesets(conn: Connection, pokemon_name: str, movesets: list[dict]) -
             ability_id = _lookup_id(cur, "abilities", "name", ability_norm) if ability_norm else None
 
             item_raw = (ms.get("items") or [None])[0]
+            format_raw = ms.get("format", None)
 
             cur.execute(
                 """
-                INSERT INTO competitive_sets (pokemon_id, name, nature_id, ability_id, item)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO competitive_sets (pokemon_id, name, nature_id, ability_id, item, format)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
-                (pokemon_id, set_name, nature_id, ability_id, item_raw),
+                (pokemon_id, set_name, nature_id, ability_id, item_raw, format_raw),
             )
             set_id = cur.fetchone()[0]
 

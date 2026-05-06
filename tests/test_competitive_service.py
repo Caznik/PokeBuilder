@@ -52,8 +52,8 @@ class TestGetSetsForPokemon:
         cursor.fetchone.side_effect = [(1,)]
         # sets query
         cursor.fetchall.side_effect = [
-            # set rows: (id, name, nature, ability, item, hp, atk, def, spa, spd, spe)
-            [(10, "Offensive", "jolly", "rough-skin", "Choice Scarf", 0, 252, 0, 0, 4, 252)],
+            # set rows: (id, name, nature, ability, item, hp, atk, def, spa, spd, spe, format)
+            [(10, "Offensive", "jolly", "rough-skin", "Choice Scarf", 0, 252, 0, 0, 4, 252, "OU")],
             # moves for set 10
             [("earthquake",), ("dragon-claw",), ("stone-edge",), ("fire-fang",)],
         ]
@@ -105,8 +105,8 @@ class TestGetSetsForPokemon:
         cursor.fetchone.side_effect = [(1,)]
         cursor.fetchall.side_effect = [
             [
-                (10, "Choice Scarf", "jolly", "rough-skin", "Choice Scarf", 0, 252, 0, 0, 4, 252),
-                (11, "Defensive", "impish", "rough-skin", "Rocky Helmet",  252, 0, 252, 0, 4, 0),
+                (10, "Choice Scarf", "jolly", "rough-skin", "Choice Scarf", 0, 252, 0, 0, 4, 252, "OU"),
+                (11, "Defensive",    "impish", "rough-skin", "Rocky Helmet", 252, 0, 252, 0, 4, 0,  None),
             ],
             [("earthquake",)],   # moves for set 10
             [("stealth-rock",)], # moves for set 11
@@ -123,7 +123,7 @@ class TestGetSetsForPokemon:
         cursor = MagicMock()
         cursor.fetchone.side_effect = [(1,)]
         cursor.fetchall.side_effect = [
-            [(10, None, None, None, None, 0, 0, 0, 0, 0, 0)],
+            [(10, None, None, None, None, 0, 0, 0, 0, 0, 0, None)],
             [],
         ]
 
@@ -133,3 +133,29 @@ class TestGetSetsForPokemon:
         assert result[0]["ability"] is None
         assert result[0]["item"] is None
         assert result[0]["moves"] == []
+
+    def test_format_field_is_returned_per_set(self):
+        """Each set dict must include a 'format' key from the competitive_sets table."""
+        cursor = MagicMock()
+        cursor.fetchone.side_effect = [(1,)]
+        cursor.fetchall.side_effect = [
+            [(10, "VGC Scarf", "jolly", "rough-skin", "Choice Scarf", 0, 252, 0, 0, 4, 252, "VGC 2025 Reg G")],
+            [("earthquake",)],
+        ]
+
+        result = get_sets_for_pokemon(cursor, "garchomp")
+
+        assert result[0]["format"] == "VGC 2025 Reg G"
+
+    def test_null_format_returned_as_none(self):
+        """Sets with no format stored should return None for 'format'."""
+        cursor = MagicMock()
+        cursor.fetchone.side_effect = [(1,)]
+        cursor.fetchall.side_effect = [
+            [(10, "Offensive", "jolly", "rough-skin", "Choice Scarf", 0, 252, 0, 0, 4, 252, None)],
+            [("earthquake",)],
+        ]
+
+        result = get_sets_for_pokemon(cursor, "garchomp")
+
+        assert result[0]["format"] is None

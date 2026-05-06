@@ -39,7 +39,8 @@ def get_sets_for_pokemon(cursor: Any, pokemon_name: str) -> list[dict]:
             COALESCE(cse.defense,    0),
             COALESCE(cse.sp_attack,  0),
             COALESCE(cse.sp_defense, 0),
-            COALESCE(cse.speed,      0)
+            COALESCE(cse.speed,      0),
+            cs.format
         FROM competitive_sets cs
         LEFT JOIN natures  n   ON cs.nature_id  = n.id
         LEFT JOIN abilities a  ON cs.ability_id = a.id
@@ -81,7 +82,8 @@ def get_sets_for_pokemon(cursor: Any, pokemon_name: str) -> list[dict]:
                 "sp_defense": r[9],
                 "speed":      r[10],
             },
-            "moves": moves,
+            "moves":  moves,
+            "format": r[11],
         })
 
     return results

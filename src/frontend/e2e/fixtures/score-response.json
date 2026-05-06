@@ -1,0 +1,19 @@
+{
+  "score": 72.5,
+  "breakdown": {
+    "coverage": { "score": 15.0, "reason": "Good coverage" },
+    "defensive": { "score": 12.0, "reason": "Decent defense" },
+    "role": { "score": 18.0, "reason": "Clear roles" },
+    "speed_control": { "score": 14.0, "reason": "Has speed control" },
+    "lead_pair": { "score": 13.5, "reason": "Solid lead" }
+  },
+  "analysis": {
+    "valid": true,
+    "issues": [],
+    "roles": { "attacker": 4, "support": 2 },
+    "weaknesses": { "ground": 2 },
+    "resistances": { "steel": 1 },
+    "coverage": { "covered_types": ["fire", "water", "electric"], "missing_types": ["ghost"] },
+    "speed_control_archetype": "fast"
+  }
+}

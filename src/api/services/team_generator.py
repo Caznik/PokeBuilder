@@ -1,9 +1,13 @@
 # src/api/services/team_generator.py
 """Guided random team generation engine."""
 
+import logging
 import random
 import re
 from typing import Any, NamedTuple
+
+_LOG = logging.getLogger(__name__)
+_MIN_POOL_DISTINCT = 6
 
 from ..models.generation import GenerationConstraints
 from ..models.team import PokemonBuild
@@ -48,26 +52,33 @@ class PoolEntry(NamedTuple):
     primary_type: str | None
 
 
-def _build_pool(conn: Any) -> list[PoolEntry]:
-    """Query all competitive sets with their Pokémon name and primary type.
+def _build_pool(conn: Any, format_filter: str | None = None) -> list[PoolEntry]:
+    """Query competitive sets with their Pokémon name and primary type.
 
     Args:
         conn: Active psycopg2 connection.
+        format_filter: Optional format string. When set, only sets whose
+            format column matches ILIKE '%{format_filter}%' are
+            returned. When None (default), all sets are returned.
 
     Returns:
-        List of PoolEntry tuples, one per competitive set in the DB.
+        List of PoolEntry tuples, one per matching competitive set in the DB.
+    """
+    _BASE_QUERY = """
+        SELECT p.name, cs.id, cs.name, t.name AS primary_type
+        FROM competitive_sets cs
+        JOIN pokemon p ON cs.pokemon_id = p.id
+        LEFT JOIN pokemon_types pt ON p.id = pt.pokemon_id AND pt.slot = 1
+        LEFT JOIN types t ON pt.type_id = t.id
     """
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT p.name, cs.id, cs.name, t.name AS primary_type
-            FROM competitive_sets cs
-            JOIN pokemon p ON cs.pokemon_id = p.id
-            LEFT JOIN pokemon_types pt ON p.id = pt.pokemon_id AND pt.slot = 1
-            LEFT JOIN types t ON pt.type_id = t.id
-            ORDER BY p.name, cs.id
-            """
-        )
+        if format_filter is None:
+            cur.execute(_BASE_QUERY + "ORDER BY p.name, cs.id")
+        else:
+            cur.execute(
+                _BASE_QUERY + "WHERE cs.format ILIKE %s ORDER BY p.name, cs.id",
+                (f"%{format_filter}%",),
+            )
         return [PoolEntry(*row) for row in cur.fetchall()]
 
 
@@ -306,9 +317,10 @@ def generate_teams(
     if constraints is None:
         constraints = GenerationConstraints()
 
-    pool = _build_pool(conn)
-
     regulation_name = None
+    allowed: set[str] | None = None
+    format_filter: str | None = None
+
     if constraints.regulation_id is not None:
         regulation_name, allowed = regulation_service.get_regulation_info(
             conn, constraints.regulation_id
@@ -318,6 +330,21 @@ def generate_teams(
                 raise ValueError(
                     f"include Pokémon '{name}' is not permitted under the selected regulation"
                 )
+        if "vgc" in regulation_name.lower():
+            format_filter = "VGC"
+
+    pool = _build_pool(conn, format_filter=format_filter)
+
+    if format_filter is not None:
+        distinct = {e.pokemon_name for e in pool}
+        if len(distinct) < _MIN_POOL_DISTINCT:
+            _LOG.warning(
+                "VGC format filter returned only %d distinct Pokémon; "                "falling back to full pool",
+                len(distinct),
+            )
+            pool = _build_pool(conn, format_filter=None)
+
+    if allowed is not None:
         pool = [e for e in pool if e.pokemon_name.lower() in allowed]
 
     _validate_constraints(pool, constraints, regulation_name=regulation_name)

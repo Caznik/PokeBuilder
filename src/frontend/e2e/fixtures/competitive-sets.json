@@ -1,0 +1,14 @@
+{
+  "pokemon": "pikachu",
+  "sets": [
+    {
+      "id": 1,
+      "name": "Standard Pikachu",
+      "nature": "Timid",
+      "ability": "Static",
+      "item": "Light Ball",
+      "evs": { "hp": 0, "attack": 0, "defense": 0, "sp_attack": 252, "sp_defense": 4, "speed": 252 },
+      "moves": ["Thunderbolt", "Volt Switch", "Grass Knot", "Quick Attack"]
+    }
+  ]
+}
