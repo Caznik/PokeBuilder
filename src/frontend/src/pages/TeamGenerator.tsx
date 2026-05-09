@@ -81,6 +81,11 @@ export default function TeamGenerator() {
                 <option key={r.id} value={r.id}>{r.name}</option>
               ))}
             </select>
+            {regulationId !== null && (
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                Candidates will be drawn only from {regulations.find(r => r.id === regulationId)?.name} Pokémon.
+              </p>
+            )}
           </div>
         )}
         <PokemonTagInput

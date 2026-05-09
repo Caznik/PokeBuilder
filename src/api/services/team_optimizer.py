@@ -313,17 +313,20 @@ def optimize_team(
 
     pool = _build_pool(conn, format_filter=format_filter)
 
+    if allowed is not None:
+        pool = [e for e in pool if e.pokemon_name.lower() in allowed]
+
     if format_filter is not None:
         distinct = {e.pokemon_name for e in pool}
         if len(distinct) < _MIN_POOL_DISTINCT:
             _LOG.warning(
-                "VGC format filter returned only %d distinct Pokémon; "                "falling back to full pool",
+                "VGC format filter yielded only %d distinct Pokémon for this regulation; "
+                "falling back to full competitive-set pool",
                 len(distinct),
             )
             pool = _build_pool(conn, format_filter=None)
-
-    if allowed is not None:
-        pool = [e for e in pool if e.pokemon_name.lower() in allowed]
+            if allowed is not None:
+                pool = [e for e in pool if e.pokemon_name.lower() in allowed]
 
     _validate_constraints(pool, constraints, regulation_name=regulation_name)
     filtered_pool = _apply_constraints(pool, constraints)
