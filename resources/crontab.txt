@@ -1,0 +1,4 @@
+# Battle log fetcher — runs daily at 06:00
+# Apply with: crontab resources/crontab.txt
+# Or append with: (crontab -l 2>/dev/null; cat resources/crontab.txt) | crontab -
+0 6 * * * cd /workspaces/PokeBuilder && python -m src.ingestors.battle_log_fetcher >> logs/battle_log_fetcher.log 2>&1

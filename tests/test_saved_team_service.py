@@ -84,7 +84,7 @@ class TestSaveTeam:
             fetchall_return=member_rows,
         )
         with patch("src.api.services.saved_team_service.load_build", return_value=_FAKE_BUILD):
-            result = save_team(mock_conn, "My Team", _MEMBERS, 8.5, _BREAKDOWN, _ANALYSIS)
+            result = save_team(mock_conn, 1, "My Team", _MEMBERS, 8.5, _BREAKDOWN, _ANALYSIS)
         assert isinstance(result, SavedTeamDetail)
         assert result.id == 1
         assert result.name == "My Team"
@@ -96,7 +96,7 @@ class TestSaveTeam:
             fetchone_return=(1, "My Team", 8.5, _NOW)
         )
         with patch("src.api.services.saved_team_service.load_build", return_value=_FAKE_BUILD):
-            save_team(mock_conn, "My Team", _MEMBERS, 8.5, _BREAKDOWN, _ANALYSIS)
+            save_team(mock_conn, 1, "My Team", _MEMBERS, 8.5, _BREAKDOWN, _ANALYSIS)
         # 1 INSERT saved_teams + 6 INSERTs members + 1 SELECT for _load_members
         assert mock_cursor.execute.call_count == 8
 
@@ -105,7 +105,7 @@ class TestSaveTeam:
             fetchone_return=(1, "My Team", 8.5, _NOW)
         )
         with patch("src.api.services.saved_team_service.load_build", return_value=_FAKE_BUILD):
-            save_team(mock_conn, "My Team", _MEMBERS, 8.5, _BREAKDOWN, _ANALYSIS)
+            save_team(mock_conn, 1, "My Team", _MEMBERS, 8.5, _BREAKDOWN, _ANALYSIS)
         mock_conn.commit.assert_called_once()
 
 
@@ -120,7 +120,7 @@ class TestListTeams:
             member_rows,
             member_rows,
         ]
-        result = list_teams(mock_conn)
+        result = list_teams(mock_conn, 1)
         assert len(result) == 2
         assert all(isinstance(t, SavedTeamSummary) for t in result)
         assert result[0].name == "Team A"
@@ -128,7 +128,7 @@ class TestListTeams:
     def test_empty_returns_empty_list(self):
         mock_conn, mock_cursor = _make_conn(fetchall_return=[])
         mock_cursor.fetchall.side_effect = [[]]
-        result = list_teams(mock_conn)
+        result = list_teams(mock_conn, 1)
         assert result == []
 
 
@@ -147,7 +147,7 @@ class TestGetTeam:
         mock_conn, mock_cursor = _make_conn()
         mock_cursor.fetchone.return_value = (1, "My Team", 8.5, _NOW, breakdown_json, analysis_json)
         mock_cursor.fetchall.return_value = member_rows
-        result = get_team(mock_conn, 1)
+        result = get_team(mock_conn, 1, 1)
         assert isinstance(result, SavedTeamDetail)
         assert result.id == 1
         assert len(result.members) == 6
@@ -155,7 +155,7 @@ class TestGetTeam:
     def test_raises_value_error_when_not_found(self):
         mock_conn, mock_cursor = _make_conn(fetchone_return=None)
         with pytest.raises(ValueError, match="not found"):
-            get_team(mock_conn, 999)
+            get_team(mock_conn, 999, 1)
 
 
 class TestUpdateTeam:
@@ -168,13 +168,13 @@ class TestUpdateTeam:
         mock_conn, mock_cursor = _make_conn()
         mock_cursor.fetchone.return_value = (1, "New Name", 8.5, _NOW, breakdown_json, analysis_json)
         mock_cursor.fetchall.return_value = member_rows
-        result = update_team(mock_conn, 1, name="New Name")
+        result = update_team(mock_conn, 1, 1, name="New Name")
         assert result.name == "New Name"
 
     def test_raises_value_error_when_not_found(self):
         mock_conn, mock_cursor = _make_conn(fetchone_return=None)
         with pytest.raises(ValueError, match="not found"):
-            update_team(mock_conn, 999, name="Ghost")
+            update_team(mock_conn, 999, 1, name="Ghost")
 
 
 class TestUpdateMember:
@@ -196,7 +196,7 @@ class TestUpdateMember:
         mock_cursor.fetchone.return_value = (1, "My Team", 8.0, _NOW, breakdown_dict, analysis_dict)
 
         req = UpdateMemberRequest(pokemon_name="rillaboom", set_id=7)
-        result = update_member(mock_conn, 1, slot=0, request=req)
+        result = update_member(mock_conn, 1, 1, slot=0, request=req)
 
         assert isinstance(result, SavedTeamDetail)
 
@@ -205,20 +205,20 @@ class TestUpdateMember:
         mock_conn, mock_cursor = _make_conn(fetchone_return=None, rowcount=0)
         req = UpdateMemberRequest(pokemon_name="rillaboom", set_id=7)
         with pytest.raises(ValueError, match="not found"):
-            update_member(mock_conn, 999, slot=0, request=req)
+            update_member(mock_conn, 999, 1, slot=0, request=req)
 
 
 class TestDeleteTeam:
     def test_executes_delete(self):
         mock_conn, mock_cursor = _make_conn()
-        delete_team(mock_conn, 1)
+        delete_team(mock_conn, 1, 1)
         mock_cursor.execute.assert_called_once()
         mock_conn.commit.assert_called_once()
 
     def test_raises_value_error_when_not_found(self):
         mock_conn, mock_cursor = _make_conn(rowcount=0)
         with pytest.raises(ValueError, match="not found"):
-            delete_team(mock_conn, 999)
+            delete_team(mock_conn, 999, 1)
 
 
 def test_save_team_populates_member_detail_columns():
@@ -270,7 +270,7 @@ def test_save_team_populates_member_detail_columns():
         "src.api.services.saved_team_service.load_build",
         return_value=fake_build,
     ) as mock_load:
-        save_team(conn, "My Team", members, 8.5, _bd, _an)
+        save_team(conn, 1, "My Team", members, 8.5, _bd, _an)
 
     # load_build called once per member
     assert mock_load.call_count == 6
@@ -331,7 +331,7 @@ def test_update_member_patches_item_without_rescoring():
     ] + [(i, f"poke{i}", i, None, None, None, None, None, None, None) for i in range(1, 6)]
 
     with patch("src.api.services.saved_team_service.score_team") as mock_score:
-        result = update_member(conn, team_id=1, slot=0, request=req)
+        result = update_member(conn, team_id=1, user_id=1, slot=0, request=req)
 
     mock_score.assert_not_called()
     assert isinstance(result, SavedTeamDetail)
@@ -347,10 +347,11 @@ def test_update_member_raises_on_missing_slot():
     cur = MagicMock()
     conn.cursor.return_value.__enter__ = MagicMock(return_value=cur)
     conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
-    cur.rowcount = 0
+    # fetchone returns None so get_team (ownership check) raises ValueError
+    cur.fetchone.return_value = None
 
     with pytest.raises(ValueError, match="not found"):
-        update_member(conn, team_id=999, slot=0, request=req)
+        update_member(conn, team_id=999, user_id=1, slot=0, request=req)
 
 
 def test_load_members_returns_item_and_tera_type():

@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 const links = [
   { to: '/pokemon', label: 'Pokémon' },
@@ -9,13 +10,18 @@ const links = [
 ]
 
 export default function Navbar() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    await logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <nav
       className="flex items-center gap-6 px-5 py-3"
-      style={{
-        background: 'var(--surface)',
-        borderBottom: '1px solid var(--border)',
-      }}
+      style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}
     >
       <span
         className="mr-4 font-mono font-semibold text-base tracking-tight"
@@ -36,6 +42,39 @@ export default function Navbar() {
           {label}
         </NavLink>
       ))}
+      <div className="ml-auto flex items-center gap-4">
+        {user ? (
+          <>
+            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              {user.email}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="text-sm"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Logout
+            </button>
+          </>
+        ) : (
+          <>
+            <NavLink
+              to="/login"
+              className="text-sm"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Log in
+            </NavLink>
+            <NavLink
+              to="/register"
+              className="text-sm font-medium"
+              style={{ color: 'var(--accent)' }}
+            >
+              Register
+            </NavLink>
+          </>
+        )}
+      </div>
     </nav>
   )
 }

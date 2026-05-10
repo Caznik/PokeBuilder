@@ -62,6 +62,7 @@ def _load_members(cur: Any, team_id: int) -> list[SavedTeamMember]:
 
 def save_team(
     conn: Any,
+    user_id: int,
     name: str,
     members: list[TeamMemberInput],
     score: float,
@@ -72,6 +73,7 @@ def save_team(
 
     Args:
         conn: Active psycopg2 connection.
+        user_id: Owner's user id.
         name: User-given label for the team.
         members: Ordered list of exactly 6 team members.
         score: Team score snapshot.
@@ -86,11 +88,11 @@ def save_team(
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO saved_teams (name, score, breakdown, analysis)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO saved_teams (user_id, name, score, breakdown, analysis)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING id, name, score, created_at
             """,
-            (name, score, json.dumps(breakdown.model_dump()), json.dumps(analysis.model_dump())),
+            (user_id, name, score, json.dumps(breakdown.model_dump()), json.dumps(analysis.model_dump())),
         )
         row = cur.fetchone()
         team_id = row[0]
@@ -129,18 +131,20 @@ def save_team(
     )
 
 
-def list_teams(conn: Any) -> list[SavedTeamSummary]:
-    """Return all saved teams ordered by creation date descending (summary only).
+def list_teams(conn: Any, user_id: int) -> list[SavedTeamSummary]:
+    """Return all saved teams for user_id ordered newest first (summary only).
 
     Args:
         conn: Active psycopg2 connection.
+        user_id: Owner's user id.
 
     Returns:
         List of SavedTeamSummary, newest first.
     """
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT id, name, score, created_at FROM saved_teams ORDER BY created_at DESC"
+            "SELECT id, name, score, created_at FROM saved_teams WHERE user_id = %s ORDER BY created_at DESC",
+            (user_id,),
         )
         rows = cur.fetchall()
         return [
@@ -152,23 +156,24 @@ def list_teams(conn: Any) -> list[SavedTeamSummary]:
         ]
 
 
-def get_team(conn: Any, team_id: int) -> SavedTeamDetail:
-    """Fetch a single saved team with full analysis.
+def get_team(conn: Any, team_id: int, user_id: int) -> SavedTeamDetail:
+    """Fetch a single saved team with full analysis (must belong to user_id).
 
     Args:
         conn: Active psycopg2 connection.
         team_id: Primary key of the saved team.
+        user_id: Owner's user id.
 
     Returns:
         SavedTeamDetail with members, breakdown, and analysis.
 
     Raises:
-        ValueError: If no team with that id exists.
+        ValueError: If no team with that id exists for this user.
     """
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT id, name, score, created_at, breakdown, analysis FROM saved_teams WHERE id = %s",
-            (team_id,),
+            "SELECT id, name, score, created_at, breakdown, analysis FROM saved_teams WHERE id = %s AND user_id = %s",
+            (team_id, user_id),
         )
         row = cur.fetchone()
         if row is None:
@@ -186,17 +191,19 @@ def get_team(conn: Any, team_id: int) -> SavedTeamDetail:
 def update_team(
     conn: Any,
     team_id: int,
+    user_id: int,
     *,
     name: str | None = None,
     score: float | None = None,
     breakdown: ScoreBreakdown | None = None,
     analysis: TeamAnalysisResponse | None = None,
 ) -> SavedTeamDetail:
-    """Update team name and/or snapshot fields.
+    """Update team name and/or snapshot fields (must belong to user_id).
 
     Args:
         conn: Active psycopg2 connection.
         team_id: Primary key of the saved team.
+        user_id: Owner's user id.
         name: New name, or None to leave unchanged.
         score: New score snapshot, or None to leave unchanged.
         breakdown: New breakdown snapshot, or None to leave unchanged.
@@ -206,7 +213,7 @@ def update_team(
         Updated SavedTeamDetail.
 
     Raises:
-        ValueError: If no team with that id exists.
+        ValueError: If no team with that id exists for this user.
     """
     sets = []
     values: list[Any] = []
@@ -220,17 +227,21 @@ def update_team(
         sets.append("analysis = %s"); values.append(json.dumps(analysis.model_dump()))
 
     if sets:
-        values.append(team_id)
+        values.extend([team_id, user_id])
         with conn.cursor() as cur:
-            cur.execute(f"UPDATE saved_teams SET {', '.join(sets)} WHERE id = %s", values)
+            cur.execute(
+                f"UPDATE saved_teams SET {', '.join(sets)} WHERE id = %s AND user_id = %s",
+                values,
+            )
         conn.commit()
 
-    return get_team(conn, team_id)
+    return get_team(conn, team_id, user_id)
 
 
 def update_member(
     conn: Any,
     team_id: int,
+    user_id: int,
     slot: int,
     request: UpdateMemberRequest,
 ) -> SavedTeamDetail:
@@ -239,6 +250,7 @@ def update_member(
     Args:
         conn: Active psycopg2 connection.
         team_id: Primary key of the saved team.
+        user_id: Owner's user id.
         slot: Member index 0-5 to update.
         request: UpdateMemberRequest with required pokemon_name/set_id and
                  optional item, tera_type, evs, moves, nature, ability.
@@ -247,8 +259,10 @@ def update_member(
         Updated SavedTeamDetail.
 
     Raises:
-        ValueError: If no matching row exists.
+        ValueError: If no matching row exists or team does not belong to user.
     """
+    get_team(conn, team_id, user_id)  # ownership check
+
     sets = ["pokemon_name = %s", "set_id = %s"]
     values: list[Any] = [request.pokemon_name, request.set_id]
 
@@ -276,21 +290,24 @@ def update_member(
             raise ValueError(f"Saved team {team_id} not found or slot {slot} invalid")
 
     conn.commit()
-    return get_team(conn, team_id)
+    return get_team(conn, team_id, user_id)
 
 
-def delete_team(conn: Any, team_id: int) -> None:
+def delete_team(conn: Any, team_id: int, user_id: int) -> None:
     """Delete a saved team and cascade-remove its members.
 
     Args:
         conn: Active psycopg2 connection.
         team_id: Primary key of the saved team.
+        user_id: Owner's user id.
 
     Raises:
-        ValueError: If no team with that id exists.
+        ValueError: If no team with that id exists for this user.
     """
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM saved_teams WHERE id = %s", (team_id,))
+        cur.execute(
+            "DELETE FROM saved_teams WHERE id = %s AND user_id = %s", (team_id, user_id)
+        )
         if cur.rowcount == 0:
             raise ValueError(f"Saved team {team_id} not found")
     conn.commit()

@@ -19,6 +19,10 @@ import type {
   PokemonMovesResponse,
   Regulation,
   RegulationDetail,
+  User,
+  LoginRequest,
+  RegisterRequest,
+  CounterResponse,
 } from './types'
 
 const BASE = '/api'
@@ -31,38 +35,60 @@ async function extractError(res: Response): Promise<Error> {
   return new Error(`${res.status} ${res.statusText}`)
 }
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`)
+async function request<T>(url: string, options: RequestInit = {}, skipRefresh = false): Promise<T> {
+  const opts: RequestInit = { ...options, credentials: 'include' }
+  let res = await fetch(url, opts)
+
+  if (res.status === 401 && !skipRefresh) {
+    const refreshRes = await fetch(`${BASE}/auth/refresh`, { method: 'POST', credentials: 'include' })
+    if (!refreshRes.ok) {
+      window.location.href = '/login'
+      throw new Error('Session expired')
+    }
+    res = await fetch(url, opts)
+  }
+
+  if (res.status === 204) return undefined as T
   if (!res.ok) throw await extractError(res)
   return res.json() as Promise<T>
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+function get<T>(path: string): Promise<T> {
+  return request<T>(`${BASE}${path}`)
+}
+
+function post<T>(path: string, body: unknown, skipRefresh = false): Promise<T> {
+  return request<T>(`${BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  })
-  if (!res.ok) throw await extractError(res)
-  return res.json() as Promise<T>
+  }, skipRefresh)
 }
 
-async function patch<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+function patch<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(`${BASE}${path}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw await extractError(res)
-  return res.json() as Promise<T>
 }
 
-async function del(path: string): Promise<void> {
-  const res = await fetch(`${BASE}${path}`, { method: 'DELETE' })
-  if (!res.ok) throw await extractError(res)
+function del(path: string): Promise<void> {
+  return request<void>(`${BASE}${path}`, { method: 'DELETE' })
 }
 
 export const api = {
+  auth: {
+    me: (): Promise<User> =>
+      request<User>(`${BASE}/auth/me`, {}, true),
+    login: (body: LoginRequest): Promise<User> =>
+      post<User>('/auth/login', body, true),
+    register: (body: RegisterRequest): Promise<User> =>
+      post<User>('/auth/register', body, true),
+    logout: (): Promise<void> =>
+      request<void>(`${BASE}/auth/logout`, { method: 'POST' }, true),
+  },
+
   pokemon: {
     list: (page: number, pageSize: number, name?: string, type?: string): Promise<PokemonList> => {
       const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
@@ -109,6 +135,13 @@ export const api = {
 
     analyze: (members: TeamMemberInput[]): Promise<TeamAnalysisResponse> =>
       post<TeamAnalysisResponse>('/team/analyze', members),
+
+    counter: (regulationId: number, beamWidth?: number, metaTopN?: number): Promise<CounterResponse> =>
+      post<CounterResponse>('/team/counter', {
+        regulation_id: regulationId,
+        beam_width: beamWidth,
+        meta_top_n: metaTopN,
+      }),
   },
 
   savedTeams: {

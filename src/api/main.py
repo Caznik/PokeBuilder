@@ -1,12 +1,15 @@
 # src/api/main.py
 """Main FastAPI application entry point."""
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import (
     pokemon_router, ability_router, type_router, move_router, stat_router,
     competitive_router, team_router, generation_router, scoring_router,
-    optimization_router, saved_teams_router, regulation_router,
+    optimization_router, saved_teams_router, regulation_router, auth_router,
+    counter_router,
 )
 
 app = FastAPI(
@@ -15,16 +18,17 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configure CORS
+_CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
+app.include_router(auth_router)
 app.include_router(pokemon_router)
 app.include_router(ability_router)
 app.include_router(type_router)
@@ -37,6 +41,7 @@ app.include_router(scoring_router)
 app.include_router(optimization_router)
 app.include_router(saved_teams_router)
 app.include_router(regulation_router)
+app.include_router(counter_router)
 
 
 @app.get("/")
@@ -47,6 +52,7 @@ def root():
         "version": "1.0.0",
         "documentation": "/docs",
         "endpoints": {
+            "auth": "/auth",
             "pokemon": "/pokemon",
             "abilities": "/abilities",
             "types": "/types",

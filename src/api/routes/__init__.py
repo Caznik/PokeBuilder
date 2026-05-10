@@ -13,8 +13,10 @@ from .scoring import router as scoring_router
 from .optimization import router as optimization_router
 from .saved_teams import router as saved_teams_router
 from .regulation import router as regulation_router
+from .auth import router as auth_router
+from .counter import router as counter_router
 
 __all__ = ["pokemon_router", "ability_router", "type_router", "move_router",
            "stat_router", "competitive_router", "team_router", "generation_router",
            "scoring_router", "optimization_router", "saved_teams_router",
-           "regulation_router"]
+           "regulation_router", "auth_router", "counter_router"]

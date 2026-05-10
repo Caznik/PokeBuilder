@@ -9,9 +9,26 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
+from src.api.models.auth import UserOut
 from src.api.models.saved_team import SavedTeamDetail, SavedTeamSummary, SavedTeamMember
 from src.api.models.team import TeamAnalysisResponse, CoverageResult
 from src.api.models.scoring import ScoreBreakdown, ScoreComponent
+from src.api.services.auth_service import get_current_user
+
+_AUTH_USER = UserOut(id=1, email="test@example.com")
+
+
+def _override_auth():
+    return _AUTH_USER
+
+
+@pytest.fixture(autouse=True)
+def _apply_auth_override():
+    """Ensure the auth override is active for every test in this module."""
+    app.dependency_overrides[get_current_user] = _override_auth
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
+
 
 client = TestClient(app)
 

@@ -231,3 +231,43 @@ export interface Regulation {
 export interface RegulationDetail extends Regulation {
   pokemon: string[]
 }
+
+// Auth
+export interface User {
+  id: number
+  email: string
+}
+
+export interface LoginRequest {
+  email: string
+  password: string
+}
+
+export interface RegisterRequest {
+  email: string
+  password: string
+}
+
+// Counter optimizer
+export interface CounterRequest {
+  regulation_id: number
+  beam_width?: number
+  meta_top_n?: number
+}
+
+export interface MetaPokemon {
+  name: string
+  usage_pct: number
+}
+
+export interface MetaSnapshot {
+  top_pokemon: MetaPokemon[]
+  total_battles: number
+}
+
+export interface CounterResponse {
+  best_teams: TeamResult[]
+  algorithm: string
+  meta_snapshot: MetaSnapshot
+  replays_analyzed: number
+}
