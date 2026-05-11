@@ -5,6 +5,7 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from .routes import (
     pokemon_router, ability_router, type_router, move_router, stat_router,
     competitive_router, team_router, generation_router, scoring_router,
@@ -19,7 +20,9 @@ app = FastAPI(
 )
 
 _CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+_SESSION_SECRET = os.getenv("SESSION_SECRET_KEY", "dev-session-secret-change-in-production")
 
+app.add_middleware(SessionMiddleware, secret_key=_SESSION_SECRET)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_CORS_ORIGINS,

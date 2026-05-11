@@ -62,6 +62,19 @@ export default function Register() {
           {loading ? 'Creating account…' : 'Create account'}
         </button>
       </form>
+      <div className="my-4 flex items-center gap-2">
+        <hr className="flex-1" style={{ borderColor: 'var(--border)' }} />
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>or</span>
+        <hr className="flex-1" style={{ borderColor: 'var(--border)' }} />
+      </div>
+      <button
+        type="button"
+        onClick={() => { window.location.href = '/api/auth/google' }}
+        className="w-full py-2 rounded border text-sm font-medium"
+        style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}
+      >
+        Sign up with Google
+      </button>
       <p className="mt-4 text-sm" style={{ color: 'var(--text-muted)' }}>
         Have an account?{' '}
         <Link to="/login" style={{ color: 'var(--accent)' }}>

@@ -1,22 +1,30 @@
-"""Authentication routes: register, login, logout, refresh, me."""
+"""Authentication routes: register, login, logout, refresh, me, Google OAuth."""
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from ..db import get_db_connection
 from ..models.auth import LoginRequest, RegisterRequest, UserOut
 from ..services.auth_service import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
+    FRONTEND_URL,
+    GOOGLE_REDIRECT_URI,
     REFRESH_TOKEN_EXPIRE_DAYS,
     create_access_token,
     create_refresh_token,
     get_current_user,
     hash_password,
+    oauth,
     revoke_refresh_token,
     store_refresh_token,
     validate_and_rotate_refresh_token,
     verify_password,
 )
-from ..services.user_service import create_user, get_user_by_email, get_user_by_id
+from ..services.user_service import (
+    create_user,
+    get_or_create_google_user,
+    get_user_by_email,
+    get_user_by_id,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -160,3 +168,41 @@ def me(user: UserOut = Depends(get_current_user)):
         UserOut.
     """
     return user
+
+
+@router.get("/google")
+async def google_login(request: Request):
+    """Redirect the browser to Google's OAuth2 authorization page.
+
+    Args:
+        request: Used by authlib to store OAuth state in the session.
+
+    Returns:
+        Redirect response to Google.
+    """
+    return await oauth.google.authorize_redirect(request, GOOGLE_REDIRECT_URI)
+
+
+@router.get("/google/callback")
+async def google_callback(request: Request):
+    """Handle Google OAuth2 callback: resolve user, issue cookies, redirect to app.
+
+    Args:
+        request: Contains the OAuth code and state from Google.
+
+    Returns:
+        Redirect to /teams on success, /login?error=oauth_failed on any failure.
+    """
+    try:
+        token = await oauth.google.authorize_access_token(request)
+        userinfo = token["userinfo"]
+        with get_db_connection() as conn:
+            user = get_or_create_google_user(conn, userinfo["email"], userinfo["sub"])
+            raw_refresh = create_refresh_token()
+            store_refresh_token(conn, user.id, raw_refresh)
+        access_token = create_access_token(user.id, user.email)
+        response = RedirectResponse(url=f"{FRONTEND_URL}/teams")
+        _set_auth_cookies(response, access_token, raw_refresh)
+        return response
+    except Exception:
+        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=oauth_failed")

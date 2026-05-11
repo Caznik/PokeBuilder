@@ -2,7 +2,12 @@
 import pytest
 from unittest.mock import MagicMock
 
-from src.api.services.user_service import create_user, get_user_by_email, get_user_by_id
+from src.api.services.user_service import (
+    create_user,
+    get_user_by_email,
+    get_user_by_id,
+    get_or_create_google_user,
+)
 from src.api.models.auth import UserOut
 
 
@@ -54,3 +59,34 @@ def test_get_user_by_id_not_found():
     conn = _make_conn(fetchone_returns=[None])
     row = get_user_by_id(conn, 999)
     assert row is None
+
+
+# --- get_or_create_google_user ---
+
+def test_get_or_create_google_user_found_by_google_id():
+    conn = _make_conn(fetchone_returns=[(3, "g@example.com")])
+    user = get_or_create_google_user(conn, "g@example.com", "gid-123")
+    assert user.id == 3
+    assert user.email == "g@example.com"
+    conn.commit.assert_not_called()
+
+
+def test_get_or_create_google_user_auto_links_by_email():
+    # First fetchone (google_id lookup) -> not found
+    # Second fetchone (email lookup) -> existing password-only account
+    conn = _make_conn(fetchone_returns=[None, (5, "existing@example.com")])
+    user = get_or_create_google_user(conn, "existing@example.com", "gid-456")
+    assert user.id == 5
+    assert user.email == "existing@example.com"
+    conn.commit.assert_called_once()
+
+
+def test_get_or_create_google_user_creates_new():
+    # First fetchone (google_id lookup) -> not found
+    # Second fetchone (email lookup) -> not found
+    # Third fetchone (INSERT RETURNING) -> new row
+    conn = _make_conn(fetchone_returns=[None, None, (99, "new@example.com")])
+    user = get_or_create_google_user(conn, "new@example.com", "gid-789")
+    assert user.id == 99
+    assert user.email == "new@example.com"
+    conn.commit.assert_called_once()

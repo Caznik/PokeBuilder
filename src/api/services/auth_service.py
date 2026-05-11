@@ -1,10 +1,11 @@
-"""Authentication service: password hashing, JWT, refresh token DB ops."""
+"""Authentication service: password hashing, JWT, refresh token DB ops, OAuth client."""
 import hashlib
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from authlib.integrations.starlette_client import OAuth
 from fastapi import HTTPException, Request, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -15,6 +16,23 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_URI = os.getenv(
+    "GOOGLE_REDIRECT_URI",
+    "http://localhost:8000/auth/google/callback",
+)
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+oauth = OAuth()
+oauth.register(
+    name="google",
+    client_id=GOOGLE_CLIENT_ID,
+    client_secret=GOOGLE_CLIENT_SECRET,
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    client_kwargs={"scope": "openid email profile"},
+)
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

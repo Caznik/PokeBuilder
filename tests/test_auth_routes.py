@@ -1,8 +1,9 @@
 """Integration tests for /auth/* endpoints."""
 from contextlib import contextmanager
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi.responses import RedirectResponse as _Redirect
 from fastapi.testclient import TestClient
 
 from src.api.main import app
@@ -161,3 +162,43 @@ def test_me_authenticated():
 def test_me_unauthenticated_returns_401():
     response = client.get("/auth/me")
     assert response.status_code == 401
+
+
+# --- /auth/google ---
+
+def test_google_login_redirects_to_google():
+    with patch(
+        "src.api.routes.auth.oauth.google.authorize_redirect",
+        AsyncMock(return_value=_Redirect(url="https://accounts.google.com/o/oauth2/auth?state=x")),
+    ):
+        response = client.get("/auth/google", follow_redirects=False)
+    assert response.status_code in (302, 307)
+    assert "accounts.google.com" in response.headers["location"]
+
+
+# --- /auth/google/callback ---
+
+_GOOGLE_TOKEN = {"userinfo": {"email": "g@example.com", "sub": "gid-001"}}
+
+
+def test_google_callback_success():
+    with patch("src.api.routes.auth.oauth.google.authorize_access_token", AsyncMock(return_value=_GOOGLE_TOKEN)), \
+         patch("src.api.routes.auth.get_or_create_google_user", return_value=_USER), \
+         patch("src.api.routes.auth.get_db_connection", _mock_db), \
+         patch("src.api.routes.auth.create_refresh_token", return_value="raw-refresh"), \
+         patch("src.api.routes.auth.store_refresh_token"), \
+         patch("src.api.routes.auth.create_access_token", return_value="acc.tok.en"):
+        response = client.get("/auth/google/callback", follow_redirects=False)
+    assert response.status_code in (302, 307)
+    assert response.headers["location"] == "/teams"
+    assert "access_token" in response.cookies
+
+
+def test_google_callback_oauth_error_redirects_to_login():
+    with patch(
+        "src.api.routes.auth.oauth.google.authorize_access_token",
+        AsyncMock(side_effect=Exception("OAuth failed")),
+    ):
+        response = client.get("/auth/google/callback", follow_redirects=False)
+    assert response.status_code in (302, 307)
+    assert "oauth_failed" in response.headers["location"]

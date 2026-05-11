@@ -1,14 +1,19 @@
 // src/frontend/src/pages/Login.tsx
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(
+    searchParams.get('error') === 'oauth_failed'
+      ? 'Google sign-in failed. Please try again.'
+      : null
+  )
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -49,9 +54,6 @@ export default function Login() {
           className="px-3 py-2 rounded border text-sm"
           style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}
         />
-        {error && (
-          <p className="text-sm" style={{ color: 'var(--error, #ef4444)' }}>{error}</p>
-        )}
         <button
           type="submit"
           disabled={loading}
@@ -61,6 +63,22 @@ export default function Login() {
           {loading ? 'Logging in…' : 'Log in'}
         </button>
       </form>
+      {error && (
+        <p className="mt-3 text-sm" style={{ color: 'var(--error, #ef4444)' }}>{error}</p>
+      )}
+      <div className="my-4 flex items-center gap-2">
+        <hr className="flex-1" style={{ borderColor: 'var(--border)' }} />
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>or</span>
+        <hr className="flex-1" style={{ borderColor: 'var(--border)' }} />
+      </div>
+      <button
+        type="button"
+        onClick={() => { window.location.href = '/api/auth/google' }}
+        className="w-full py-2 rounded border text-sm font-medium"
+        style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}
+      >
+        Sign in with Google
+      </button>
       <p className="mt-4 text-sm" style={{ color: 'var(--text-muted)' }}>
         No account?{' '}
         <Link to="/register" style={{ color: 'var(--accent)' }}>
