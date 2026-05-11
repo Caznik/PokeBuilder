@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { api } from '../api/client'
 import type {
   CompetitiveSet,
+  Regulation,
   ScoreResponse,
   TeamAnalysisResponse,
   SavedTeamMember,
@@ -79,9 +80,12 @@ export default function TeamBuilder() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [savedSuccess, setSavedSuccess] = useState(false)
+  const [regulations, setRegulations] = useState<Regulation[]>([])
+  const [regulationId, setRegulationId] = useState<number | null>(null)
 
   useEffect(() => {
     api.types.list().then((types) => setAllTypes(types.map((t) => t.name)))
+    api.regulations.list().then(setRegulations).catch(() => setRegulations([]))
   }, [])
 
   async function loadSets(index: number, nameOverride: string, setIdOverride?: number) {
@@ -211,6 +215,7 @@ export default function TeamBuilder() {
         score: scoreResult.score,
         breakdown: scoreResult.breakdown,
         analysis: scoreResult.analysis,
+        regulation_id: regulationId,
       })
       setSavedSuccess(true)
     } catch (e: unknown) {
@@ -560,6 +565,24 @@ export default function TeamBuilder() {
             }}>
               Save Team
             </div>
+            {regulations.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <select
+                  value={regulationId ?? ''}
+                  onChange={(e) => setRegulationId(e.target.value === '' ? null : Number(e.target.value))}
+                  style={{
+                    width: '100%', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)',
+                    color: 'var(--text)', borderRadius: 4, padding: '5px 10px',
+                    fontSize: 12, fontFamily: 'var(--font-mono)', colorScheme: 'dark',
+                  }}
+                >
+                  <option value="">No regulation</option>
+                  {regulations.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <input
                 type="text"

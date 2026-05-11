@@ -35,7 +35,7 @@ export default function Teams() {
   // Fetch regulations list once when the saved tab is first visited
   useEffect(() => {
     if (tab !== 'saved') return
-    api.regulations.list().then(setRegulations).catch(() => {/* non-critical */})
+    api.regulations.list().then(setRegulations).catch(() => setRegulations([]))
   }, [tab])
 
   // Fetch teams when the tab is active or when the regulation filter changes
@@ -70,7 +70,6 @@ export default function Teams() {
 
   function handleFilterChange(value: string) {
     if (value === 'all') setRegulationFilter(undefined)
-    else if (value === 'none') setRegulationFilter(null)
     else setRegulationFilter(Number(value))
     setTeamsLoaded(false)
   }
@@ -148,7 +147,6 @@ export default function Teams() {
               }}
             >
               <option value="all">All</option>
-              <option value="none">No regulation</option>
               {regulations.map((r) => (
                 <option key={r.id} value={String(r.id)}>{r.name}</option>
               ))}

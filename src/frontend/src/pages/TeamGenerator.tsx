@@ -59,6 +59,7 @@ export default function TeamGenerator() {
       breakdown: team.breakdown,
       members: team.members.map((m) => ({ pokemon_name: m.pokemon_name, set_id: m.set_id })),
       analysis: team.analysis,
+      regulation_id: regulationId,
     })
   }
 
