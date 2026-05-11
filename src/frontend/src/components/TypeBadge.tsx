@@ -23,18 +23,19 @@ const FALLBACK = { bg: 'oklch(0.30 0.005 250)', fg: 'oklch(0.75 0.01 250)' }
 
 interface TypeBadgeProps {
   typeName: string
+  small?: boolean
 }
 
-export default function TypeBadge({ typeName }: TypeBadgeProps) {
+export default function TypeBadge({ typeName, small }: TypeBadgeProps) {
   const c = TYPE_COLORS[typeName.toLowerCase()] ?? FALLBACK
   return (
     <span
       style={{
         background: c.bg,
         color: c.fg,
-        padding: '2px 8px',
+        padding: small ? '1px 5px' : '2px 8px',
         borderRadius: 999,
-        fontSize: 10,
+        fontSize: small ? 8 : 10,
         fontWeight: 600,
         letterSpacing: '0.05em',
         textTransform: 'uppercase',

@@ -147,6 +147,7 @@ export default function TeamBuilder() {
   }
 
   function handlePickerTypeToggle(index: number, type: string, currentSearch: string, currentType: string | null) {
+    clearTimeout(debounceTimers.current[index])
     const newType = currentType === type ? null : type
     updateSlot(index, { pickerType: newType })
     fetchPickerResults(index, currentSearch, newType)
@@ -375,7 +376,7 @@ export default function TeamBuilder() {
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'center', gap: 3, flexWrap: 'wrap' }}>
                               {p.types.map((t) => (
-                                <TypeBadge key={t.type_id} typeName={t.type_name} />
+                                <TypeBadge key={t.type_id} typeName={t.type_name} small />
                               ))}
                             </div>
                           </button>
