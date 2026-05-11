@@ -1,7 +1,7 @@
 # src/api/routes/saved_teams.py
 """Saved teams API routes."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
 from ..models.auth import UserOut
@@ -14,6 +14,7 @@ from ..models.saved_team import (
 )
 from ..services.auth_service import get_current_user
 from ..services.saved_team_service import (
+    _UNSET,
     delete_team,
     get_team,
     list_teams,
@@ -31,28 +32,43 @@ def save_team_endpoint(body: SaveTeamRequest, user: UserOut = Depends(get_curren
     """Save a team with its score, breakdown, and analysis snapshot.
 
     Args:
-        body: Team name, 6 members, score, breakdown, and analysis.
+        body: Team name, 6 members, score, breakdown, analysis, and optional regulation_id.
         user: Authenticated user from access_token cookie.
 
     Returns:
         The newly created SavedTeamDetail.
     """
     with get_db_connection() as conn:
-        return save_team(conn, user.id, body.name, body.members, body.score, body.breakdown, body.analysis)
+        return save_team(
+            conn, user.id, body.name, body.members,
+            body.score, body.breakdown, body.analysis,
+            regulation_id=body.regulation_id,
+        )
 
 
 @router.get("/", response_model=list[SavedTeamSummary])
-def list_teams_endpoint(user: UserOut = Depends(get_current_user)):
-    """List all saved teams for the current user, newest first.
+def list_teams_endpoint(
+    user: UserOut = Depends(get_current_user),
+    regulation_id: int | None = Query(
+        default=None,
+        description=(
+            "Filter by regulation: omit for all teams, "
+            "0 for teams with no regulation, "
+            "positive integer for a specific regulation."
+        ),
+    ),
+):
+    """List saved teams for the current user, newest first, with optional regulation filter.
 
     Args:
         user: Authenticated user from access_token cookie.
+        regulation_id: Optional filter (None=all, 0=no regulation, n>0=specific regulation).
 
     Returns:
         List of SavedTeamSummary.
     """
     with get_db_connection() as conn:
-        return list_teams(conn, user.id)
+        return list_teams(conn, user.id, regulation_id=regulation_id)
 
 
 @router.get("/{team_id}", response_model=SavedTeamDetail)
@@ -87,6 +103,9 @@ def update_team_endpoint(team_id: int, body: UpdateTeamRequest, user: UserOut = 
     """
     if not body.has_update():
         raise HTTPException(status_code=422, detail="At least one field must be provided")
+    regulation_id_arg = (
+        body.regulation_id if "regulation_id" in body.model_fields_set else _UNSET
+    )
     try:
         with get_db_connection() as conn:
             return update_team(
@@ -95,6 +114,7 @@ def update_team_endpoint(team_id: int, body: UpdateTeamRequest, user: UserOut = 
                 score=body.score,
                 breakdown=body.breakdown,
                 analysis=body.analysis,
+                regulation_id=regulation_id_arg,
             )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

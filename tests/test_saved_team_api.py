@@ -233,3 +233,43 @@ class TestDeleteEndpoint:
         ):
             resp = client.delete("/saved-teams/999")
         assert resp.status_code == 404
+
+
+class TestListFilterByRegulation:
+    """Verify the regulation_id query param is forwarded to list_teams."""
+
+    def test_filter_by_regulation_id_passes_param_to_service(self):
+        """?regulation_id=1 → list_teams called with regulation_id=1."""
+        with (
+            patch("src.api.routes.saved_teams.get_db_connection", return_value=_mock_db()),
+            patch("src.api.routes.saved_teams.list_teams", return_value=[]) as mock_list,
+        ):
+            resp = client.get("/saved-teams/?regulation_id=1")
+        assert resp.status_code == 200
+        mock_list.assert_called_once()
+        _, kwargs = mock_list.call_args
+        assert kwargs.get("regulation_id") == 1
+
+    def test_filter_by_null_sentinel_passes_zero_to_service(self):
+        """?regulation_id=0 (no-regulation sentinel) → list_teams called with regulation_id=0."""
+        with (
+            patch("src.api.routes.saved_teams.get_db_connection", return_value=_mock_db()),
+            patch("src.api.routes.saved_teams.list_teams", return_value=[]) as mock_list,
+        ):
+            resp = client.get("/saved-teams/?regulation_id=0")
+        assert resp.status_code == 200
+        mock_list.assert_called_once()
+        _, kwargs = mock_list.call_args
+        assert kwargs.get("regulation_id") == 0
+
+    def test_no_param_passes_none_to_service(self):
+        """No query param → list_teams called with regulation_id=None."""
+        with (
+            patch("src.api.routes.saved_teams.get_db_connection", return_value=_mock_db()),
+            patch("src.api.routes.saved_teams.list_teams", return_value=[]) as mock_list,
+        ):
+            resp = client.get("/saved-teams/")
+        assert resp.status_code == 200
+        mock_list.assert_called_once()
+        _, kwargs = mock_list.call_args
+        assert kwargs.get("regulation_id") is None
