@@ -84,6 +84,7 @@ beforeEach(() => {
     name: 'My Team',
     score: 7.5,
     created_at: '2026-01-01T00:00:00Z',
+    regulation_id: null,
     members: [],
     breakdown: MOCK_SCORE.breakdown,
     analysis: MOCK_SCORE.analysis,

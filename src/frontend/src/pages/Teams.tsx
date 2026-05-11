@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
-import type { SavedTeamSummary, PokemonType } from '../api/types'
+import type { Regulation, SavedTeamSummary, PokemonType } from '../api/types'
 import TypeBadge from '../components/TypeBadge'
 import TeamBuilder from './TeamBuilder'
 
@@ -12,6 +12,9 @@ function titleCase(s: string) {
 function spriteUrl(name: string) {
   return `https://img.pokemondb.net/sprites/home/normal/${name}.png`
 }
+
+// undefined = all teams; null = no regulation; number = specific regulation
+type RegulationFilter = number | null | undefined
 
 export default function Teams() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -26,13 +29,21 @@ export default function Teams() {
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
-  // Single effect: fetch teams on mount (for count) and on every saved-tab visit.
-  // When on saved tab, also chain-fetch types from the fresh list.
+  const [regulations, setRegulations] = useState<Regulation[]>([])
+  const [regulationFilter, setRegulationFilter] = useState<RegulationFilter>(undefined)
+
+  // Fetch regulations list once when the saved tab is first visited
+  useEffect(() => {
+    if (tab !== 'saved') return
+    api.regulations.list().then(setRegulations).catch(() => setRegulations([]))
+  }, [tab])
+
+  // Fetch teams when the tab is active or when the regulation filter changes
   useEffect(() => {
     if (tab !== 'saved' && teamsLoaded) return
     setTeamsLoading(true)
     setTeamsError(null)
-    api.savedTeams.list()
+    api.savedTeams.list(regulationFilter)
       .then((list) => {
         setTeams(list)
         setTeamsLoaded(true)
@@ -50,11 +61,17 @@ export default function Teams() {
       })
       .catch((e: unknown) => setTeamsError(e instanceof Error ? e.message : 'Failed to load teams'))
       .finally(() => setTeamsLoading(false))
-  }, [tab])
+  }, [tab, regulationFilter])
 
   function switchTab(t: 'build' | 'saved') {
     if (t === 'build') setSearchParams({})
     else setSearchParams({ tab: 'saved' })
+  }
+
+  function handleFilterChange(value: string) {
+    if (value === 'all') setRegulationFilter(undefined)
+    else setRegulationFilter(Number(value))
+    setTeamsLoaded(false)
   }
 
   async function handleDelete(id: number) {
@@ -68,6 +85,8 @@ export default function Teams() {
       setConfirmDelete(null)
     }
   }
+
+  const filterActive = regulationFilter !== undefined
 
   return (
     <div>
@@ -104,6 +123,36 @@ export default function Teams() {
       {/* My Teams tab */}
       {tab === 'saved' && (
         <div className="space-y-4">
+          {/* Regulation filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <label
+              htmlFor="regulation-filter"
+              style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}
+            >
+              Regulation
+            </label>
+            <select
+              id="regulation-filter"
+              value={
+                regulationFilter === undefined ? 'all'
+                : regulationFilter === null ? 'none'
+                : String(regulationFilter)
+              }
+              onChange={(e) => handleFilterChange(e.target.value)}
+              style={{
+                fontSize: 11, fontFamily: 'var(--font-mono)',
+                background: 'var(--surface-2)', color: 'var(--text)',
+                border: '1px solid var(--border)', borderRadius: 6,
+                padding: '3px 8px', cursor: 'pointer',
+              }}
+            >
+              <option value="all">All</option>
+              {regulations.map((r) => (
+                <option key={r.id} value={String(r.id)}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+
           {teamsLoading && (
             <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading...</p>
           )}
@@ -115,7 +164,9 @@ export default function Teams() {
           )}
           {!teamsLoading && teamsLoaded && teams.length === 0 && (
             <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-              No saved teams yet. Build and score a team, then save it.
+              {filterActive
+                ? 'No saved teams match this filter.'
+                : 'No saved teams yet. Build and score a team, then save it.'}
             </p>
           )}
           {teams.map((team) => (

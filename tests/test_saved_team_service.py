@@ -80,7 +80,8 @@ class TestSaveTeam:
     def test_returns_saved_team_detail(self):
         member_rows = [(i, m.pokemon_name, m.set_id, None, None, None, None, None, None, None) for i, m in enumerate(_MEMBERS)]
         mock_conn, mock_cursor = _make_conn(
-            fetchone_return=(1, "My Team", 8.5, _NOW),
+            # RETURNING id, name, score, created_at, regulation_id
+            fetchone_return=(1, "My Team", 8.5, _NOW, None),
             fetchall_return=member_rows,
         )
         with patch("src.api.services.saved_team_service.load_build", return_value=_FAKE_BUILD):
@@ -93,7 +94,8 @@ class TestSaveTeam:
 
     def test_inserts_six_member_rows(self):
         mock_conn, mock_cursor = _make_conn(
-            fetchone_return=(1, "My Team", 8.5, _NOW)
+            # RETURNING id, name, score, created_at, regulation_id
+            fetchone_return=(1, "My Team", 8.5, _NOW, None)
         )
         with patch("src.api.services.saved_team_service.load_build", return_value=_FAKE_BUILD):
             save_team(mock_conn, 1, "My Team", _MEMBERS, 8.5, _BREAKDOWN, _ANALYSIS)
@@ -102,7 +104,8 @@ class TestSaveTeam:
 
     def test_commits_transaction(self):
         mock_conn, mock_cursor = _make_conn(
-            fetchone_return=(1, "My Team", 8.5, _NOW)
+            # RETURNING id, name, score, created_at, regulation_id
+            fetchone_return=(1, "My Team", 8.5, _NOW, None)
         )
         with patch("src.api.services.saved_team_service.load_build", return_value=_FAKE_BUILD):
             save_team(mock_conn, 1, "My Team", _MEMBERS, 8.5, _BREAKDOWN, _ANALYSIS)
@@ -113,10 +116,11 @@ class TestListTeams:
     def test_returns_list_of_summaries(self):
         member_rows = [(i, f"pokemon{i}", i + 1, f"set{i}", "jolly", "ability", None, None, None, None) for i in range(6)]
         mock_conn, mock_cursor = _make_conn(
-            fetchall_return=[(1, "Team A", 8.5, _NOW), (2, "Team B", 7.0, _NOW)]
+            # SELECT id, name, score, created_at, regulation_id
+            fetchall_return=[(1, "Team A", 8.5, _NOW, None), (2, "Team B", 7.0, _NOW, None)]
         )
         mock_cursor.fetchall.side_effect = [
-            [(1, "Team A", 8.5, _NOW), (2, "Team B", 7.0, _NOW)],
+            [(1, "Team A", 8.5, _NOW, None), (2, "Team B", 7.0, _NOW, None)],
             member_rows,
             member_rows,
         ]
@@ -132,6 +136,39 @@ class TestListTeams:
         assert result == []
 
 
+class TestListTeamsWithFilter:
+    """Verify list_teams builds the correct SQL for each filter mode."""
+
+    def _make_conn_no_teams(self):
+        mock_conn, mock_cursor = _make_conn(fetchall_return=[])
+        mock_cursor.fetchall.side_effect = [[]]
+        return mock_conn, mock_cursor
+
+    def test_no_filter_omits_where_clause(self):
+        """No regulation_id param → no extra WHERE filter on regulation_id in WHERE clause."""
+        mock_conn, mock_cursor = self._make_conn_no_teams()
+        list_teams(mock_conn, 1)
+        sql = mock_cursor.execute.call_args[0][0]
+        # regulation_id appears in SELECT but must NOT appear in the WHERE clause
+        assert "regulation_id IS NULL" not in sql
+        assert "regulation_id = %s" not in sql
+
+    def test_filter_by_regulation_id_builds_correct_query(self):
+        """regulation_id=3 → WHERE regulation_id = %s with value 3."""
+        mock_conn, mock_cursor = self._make_conn_no_teams()
+        list_teams(mock_conn, 1, regulation_id=3)
+        sql, params = mock_cursor.execute.call_args[0]
+        assert "regulation_id = %s" in sql
+        assert 3 in params
+
+    def test_filter_by_null_sentinel_builds_is_null_query(self):
+        """regulation_id=0 (sentinel) → WHERE regulation_id IS NULL."""
+        mock_conn, mock_cursor = self._make_conn_no_teams()
+        list_teams(mock_conn, 1, regulation_id=0)
+        sql = mock_cursor.execute.call_args[0][0]
+        assert "regulation_id IS NULL" in sql
+
+
 class TestGetTeam:
     def test_returns_detail_when_found(self):
         analysis_json = _ANALYSIS.model_dump()
@@ -145,7 +182,8 @@ class TestGetTeam:
             (5, "landorus",   6, "Scarf",        "jolly",   "intimidate", None, None, None, None),
         ]
         mock_conn, mock_cursor = _make_conn()
-        mock_cursor.fetchone.return_value = (1, "My Team", 8.5, _NOW, breakdown_json, analysis_json)
+        # SELECT id, name, score, created_at, breakdown, analysis, regulation_id
+        mock_cursor.fetchone.return_value = (1, "My Team", 8.5, _NOW, breakdown_json, analysis_json, None)
         mock_cursor.fetchall.return_value = member_rows
         result = get_team(mock_conn, 1, 1)
         assert isinstance(result, SavedTeamDetail)
@@ -166,7 +204,8 @@ class TestUpdateTeam:
             (i, f"pokemon{i}", i + 1, None, None, None, None, None, None, None) for i in range(6)
         ]
         mock_conn, mock_cursor = _make_conn()
-        mock_cursor.fetchone.return_value = (1, "New Name", 8.5, _NOW, breakdown_json, analysis_json)
+        # SELECT id, name, score, created_at, breakdown, analysis, regulation_id
+        mock_cursor.fetchone.return_value = (1, "New Name", 8.5, _NOW, breakdown_json, analysis_json, None)
         mock_cursor.fetchall.return_value = member_rows
         result = update_team(mock_conn, 1, 1, name="New Name")
         assert result.name == "New Name"
@@ -193,7 +232,8 @@ class TestUpdateMember:
 
         mock_conn, mock_cursor = _make_conn()
         mock_cursor.fetchall.return_value = member_rows
-        mock_cursor.fetchone.return_value = (1, "My Team", 8.0, _NOW, breakdown_dict, analysis_dict)
+        # SELECT id, name, score, created_at, breakdown, analysis, regulation_id
+        mock_cursor.fetchone.return_value = (1, "My Team", 8.0, _NOW, breakdown_dict, analysis_dict, None)
 
         req = UpdateMemberRequest(pokemon_name="rillaboom", set_id=7)
         result = update_member(mock_conn, 1, 1, slot=0, request=req)
@@ -256,7 +296,8 @@ def test_save_team_populates_member_detail_columns():
     cur = MagicMock()
     conn.cursor.return_value.__enter__ = MagicMock(return_value=cur)
     conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
-    cur.fetchone.side_effect = [(1, "My Team", 8.5, "2026-05-02")]
+    # RETURNING id, name, score, created_at, regulation_id
+    cur.fetchone.side_effect = [(1, "My Team", 8.5, "2026-05-02", None)]
     cur.fetchall.return_value = [
         (i, f"poke{i}", i, None, "jolly", "keen-eye",
          "Choice Scarf", None,
@@ -320,8 +361,9 @@ def test_update_member_patches_item_without_rescoring():
     conn.cursor.return_value.__enter__ = MagicMock(return_value=cur)
     conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
     cur.rowcount = 1
+    # SELECT id, name, score, created_at, breakdown, analysis, regulation_id
     cur.fetchone.return_value = (1, "My Team", 8.5, _now,
-                                 _bd.model_dump(), _an.model_dump())
+                                 _bd.model_dump(), _an.model_dump(), None)
     cur.fetchall.return_value = [
         (0, "garchomp", 1, "Scarfer", "jolly", "rough-skin",
          "Choice Scarf", "dragon",
