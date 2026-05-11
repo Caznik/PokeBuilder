@@ -19,6 +19,7 @@ class SaveTeamRequest(BaseModel):
     score: float
     breakdown: ScoreBreakdown
     analysis: TeamAnalysisResponse
+    regulation_id: int | None = None
 
     @field_validator("members")
     @classmethod
@@ -40,6 +41,7 @@ class UpdateTeamRequest(BaseModel):
     score: float | None = None
     breakdown: ScoreBreakdown | None = None
     analysis: TeamAnalysisResponse | None = None
+    regulation_id: int | None = None
 
     @field_validator("name")
     @classmethod
@@ -49,7 +51,9 @@ class UpdateTeamRequest(BaseModel):
         return v
 
     def has_update(self) -> bool:
-        return any(f is not None for f in [self.name, self.score, self.breakdown, self.analysis])
+        scalar_fields_set = any(f is not None for f in [self.name, self.score, self.breakdown, self.analysis])
+        regulation_explicitly_set = "regulation_id" in self.model_fields_set
+        return scalar_fields_set or regulation_explicitly_set
 
 
 class UpdateMemberRequest(BaseModel):
@@ -81,6 +85,7 @@ class SavedTeamSummary(BaseModel):
     name: str
     score: float
     created_at: datetime
+    regulation_id: int | None = None
     members: list[SavedTeamMember]
 
 
