@@ -13,6 +13,7 @@ vi.mock('../../api/client', () => ({
     savedTeams: { list: vi.fn(), delete: vi.fn(), get: vi.fn(), save: vi.fn() },
     competitiveSets: { get: vi.fn() },
     team: { score: vi.fn(), analyze: vi.fn() },
+    regulations: { list: vi.fn() },
   },
 }))
 
@@ -34,6 +35,7 @@ const MOCK_TEAM_SUMMARY: SavedTeamSummary = {
   name: 'Test Team',
   score: 7.5,
   created_at: '2026-01-01T00:00:00Z',
+  regulation_id: null,
   members: [1, 2, 3, 4, 5, 6].map(MOCK_MEMBER),
 }
 
@@ -65,6 +67,7 @@ beforeEach(() => {
   vi.mocked(api.pokemon.getByName).mockResolvedValue(MOCK_POKEMON_DETAIL)
   vi.mocked(api.savedTeams.list).mockResolvedValue([])
   vi.mocked(api.savedTeams.delete).mockResolvedValue(undefined)
+  vi.mocked(api.regulations.list).mockResolvedValue([])
 })
 
 describe('Teams — saved tab', () => {

@@ -47,6 +47,7 @@ const MOCK_TEAM_DETAIL: SavedTeamDetail = {
   name: 'Test Team',
   score: 7.5,
   created_at: '2026-01-01T00:00:00Z',
+  regulation_id: null,
   members: [1, 2, 3, 4, 5, 6].map(MOCK_MEMBER),
   breakdown: {
     coverage:      { score: 8, reason: 'Good' },
