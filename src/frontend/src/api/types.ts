@@ -168,6 +168,7 @@ export interface SavedTeamSummary {
   name: string
   score: number
   created_at: string
+  regulation_id: number | null
   members: SavedTeamMember[]
 }
 
@@ -182,6 +183,7 @@ export interface SaveTeamRequest {
   score: number
   breakdown: ScoreBreakdown
   analysis: TeamAnalysisResponse
+  regulation_id?: number | null
 }
 
 export interface UpdateTeamRequest {
@@ -189,6 +191,7 @@ export interface UpdateTeamRequest {
   score?: number
   breakdown?: ScoreBreakdown
   analysis?: TeamAnalysisResponse
+  regulation_id?: number | null
 }
 
 export interface UpdateMemberRequest {

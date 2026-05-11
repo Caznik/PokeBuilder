@@ -145,8 +145,14 @@ export const api = {
   },
 
   savedTeams: {
-    list: (): Promise<SavedTeamSummary[]> =>
-      get<SavedTeamSummary[]>('/saved-teams/'),
+    list: (regulationId?: number | null): Promise<SavedTeamSummary[]> => {
+      if (regulationId === undefined) {
+        return get<SavedTeamSummary[]>('/saved-teams/')
+      }
+      // null → sentinel 0 (no regulation); positive integer → that regulation
+      const param = regulationId === null ? 0 : regulationId
+      return get<SavedTeamSummary[]>(`/saved-teams/?regulation_id=${param}`)
+    },
 
     get: (id: number): Promise<SavedTeamDetail> =>
       get<SavedTeamDetail>(`/saved-teams/${id}`),
