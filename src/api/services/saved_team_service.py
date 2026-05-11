@@ -5,6 +5,9 @@ import json
 from typing import Any
 
 from ..models.saved_team import SavedTeamDetail, SavedTeamMember, SavedTeamSummary, UpdateMemberRequest
+
+# Sentinel: distinguishes "caller did not pass regulation_id" from "caller set it to None"
+_UNSET: Any = object()
 from ..models.team import CoverageResult, TeamAnalysisResponse, TeamMemberInput
 from ..models.scoring import ScoreBreakdown, ScoreComponent
 from .team_loader import load_build
@@ -68,6 +71,7 @@ def save_team(
     score: float,
     breakdown: ScoreBreakdown,
     analysis: TeamAnalysisResponse,
+    regulation_id: int | None = None,
 ) -> SavedTeamDetail:
     """Insert a new saved team and its 6 member rows.
 
@@ -79,6 +83,7 @@ def save_team(
         score: Team score snapshot.
         breakdown: Score breakdown snapshot.
         analysis: Full team analysis snapshot.
+        regulation_id: Optional regulation FK (None = no regulation).
 
     Returns:
         The newly created SavedTeamDetail.
@@ -88,11 +93,11 @@ def save_team(
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO saved_teams (user_id, name, score, breakdown, analysis)
-            VALUES (%s, %s, %s, %s, %s)
-            RETURNING id, name, score, created_at
+            INSERT INTO saved_teams (user_id, name, score, breakdown, analysis, regulation_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id, name, score, created_at, regulation_id
             """,
-            (user_id, name, score, json.dumps(breakdown.model_dump()), json.dumps(analysis.model_dump())),
+            (user_id, name, score, json.dumps(breakdown.model_dump()), json.dumps(analysis.model_dump()), regulation_id),
         )
         row = cur.fetchone()
         team_id = row[0]
@@ -127,29 +132,50 @@ def save_team(
 
     return SavedTeamDetail(
         id=row[0], name=row[1], score=float(row[2]), created_at=row[3],
+        regulation_id=row[4],
         members=saved_members, breakdown=breakdown, analysis=analysis,
     )
 
 
-def list_teams(conn: Any, user_id: int) -> list[SavedTeamSummary]:
-    """Return all saved teams for user_id ordered newest first (summary only).
+def list_teams(
+    conn: Any,
+    user_id: int,
+    regulation_id: int | None = None,
+) -> list[SavedTeamSummary]:
+    """Return saved teams for user_id ordered newest first (summary only).
 
     Args:
         conn: Active psycopg2 connection.
         user_id: Owner's user id.
+        regulation_id: Optional filter.
+            None  → return all teams (no filter).
+            0     → return teams with no regulation (regulation_id IS NULL).
+            n > 0 → return teams linked to that regulation.
 
     Returns:
         List of SavedTeamSummary, newest first.
     """
+    base_sql = (
+        "SELECT id, name, score, created_at, regulation_id "
+        "FROM saved_teams WHERE user_id = %s"
+    )
+    params: list[Any] = [user_id]
+
+    if regulation_id == 0:
+        base_sql += " AND regulation_id IS NULL"
+    elif regulation_id is not None:
+        base_sql += " AND regulation_id = %s"
+        params.append(regulation_id)
+
+    base_sql += " ORDER BY created_at DESC"
+
     with conn.cursor() as cur:
-        cur.execute(
-            "SELECT id, name, score, created_at FROM saved_teams WHERE user_id = %s ORDER BY created_at DESC",
-            (user_id,),
-        )
+        cur.execute(base_sql, params)
         rows = cur.fetchall()
         return [
             SavedTeamSummary(
                 id=row[0], name=row[1], score=float(row[2]), created_at=row[3],
+                regulation_id=row[4],
                 members=_load_members(cur, row[0]),
             )
             for row in rows
@@ -172,7 +198,8 @@ def get_team(conn: Any, team_id: int, user_id: int) -> SavedTeamDetail:
     """
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT id, name, score, created_at, breakdown, analysis FROM saved_teams WHERE id = %s AND user_id = %s",
+            "SELECT id, name, score, created_at, breakdown, analysis, regulation_id "
+            "FROM saved_teams WHERE id = %s AND user_id = %s",
             (team_id, user_id),
         )
         row = cur.fetchone()
@@ -184,6 +211,7 @@ def get_team(conn: Any, team_id: int, user_id: int) -> SavedTeamDetail:
         id=row[0], name=row[1], score=float(row[2]), created_at=row[3],
         breakdown=_parse_breakdown(row[4]),
         analysis=_parse_analysis(row[5]),
+        regulation_id=row[6],
         members=members,
     )
 
@@ -197,6 +225,7 @@ def update_team(
     score: float | None = None,
     breakdown: ScoreBreakdown | None = None,
     analysis: TeamAnalysisResponse | None = None,
+    regulation_id: Any = _UNSET,
 ) -> SavedTeamDetail:
     """Update team name and/or snapshot fields (must belong to user_id).
 
@@ -208,6 +237,7 @@ def update_team(
         score: New score snapshot, or None to leave unchanged.
         breakdown: New breakdown snapshot, or None to leave unchanged.
         analysis: New analysis snapshot, or None to leave unchanged.
+        regulation_id: New regulation FK, None to clear it, or _UNSET to leave unchanged.
 
     Returns:
         Updated SavedTeamDetail.
@@ -225,6 +255,8 @@ def update_team(
         sets.append("breakdown = %s"); values.append(json.dumps(breakdown.model_dump()))
     if analysis is not None:
         sets.append("analysis = %s"); values.append(json.dumps(analysis.model_dump()))
+    if regulation_id is not _UNSET:
+        sets.append("regulation_id = %s"); values.append(regulation_id)
 
     if sets:
         values.extend([team_id, user_id])
