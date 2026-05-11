@@ -10,27 +10,34 @@ import Regulations from './pages/Regulations'
 import Login from './pages/Login'
 import Register from './pages/Register'
 
-function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
-  if (loading) return null
-  if (!user) return <Navigate to="/login" replace />
-  return <>{children}</>
-}
-
 function AppRoutes() {
+  const { user, loading } = useAuth()
+
+  if (loading) return null
+
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    )
+  }
+
   return (
     <>
       <Navbar />
       <main className="max-w-5xl mx-auto px-4 py-6">
         <Routes>
           <Route path="/" element={<Navigate to="/pokemon" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route path="/login" element={<Navigate to="/pokemon" replace />} />
+          <Route path="/register" element={<Navigate to="/pokemon" replace />} />
           <Route path="/pokemon" element={<PokemonBrowser />} />
           <Route path="/generate" element={<TeamGenerator />} />
           <Route path="/optimize" element={<TeamOptimizer />} />
-          <Route path="/teams" element={<PrivateRoute><Teams /></PrivateRoute>} />
-          <Route path="/teams/:id" element={<PrivateRoute><TeamDetail /></PrivateRoute>} />
+          <Route path="/teams" element={<Teams />} />
+          <Route path="/teams/:id" element={<TeamDetail />} />
           <Route path="/regulations" element={<Regulations />} />
           <Route path="/build" element={<Navigate to="/teams" replace />} />
           <Route path="/analyze" element={<Navigate to="/teams" replace />} />
