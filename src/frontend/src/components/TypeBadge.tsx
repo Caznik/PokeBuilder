@@ -1,25 +1,26 @@
+// Official Pokédex identity colors — fixed values, intentionally not theme tokens.
 const TYPE_COLORS: Record<string, { bg: string; fg: string }> = {
-  normal:   { bg: 'oklch(0.55 0.02 80)',  fg: 'oklch(0.92 0.01 80)' },
-  fire:     { bg: 'oklch(0.55 0.16 35)',  fg: 'oklch(0.95 0.05 35)' },
-  water:    { bg: 'oklch(0.55 0.13 240)', fg: 'oklch(0.95 0.04 240)' },
-  electric: { bg: 'oklch(0.65 0.16 95)',  fg: 'oklch(0.20 0.05 95)' },
-  grass:    { bg: 'oklch(0.55 0.13 145)', fg: 'oklch(0.95 0.04 145)' },
-  ice:      { bg: 'oklch(0.70 0.10 200)', fg: 'oklch(0.20 0.05 200)' },
-  fighting: { bg: 'oklch(0.50 0.15 25)',  fg: 'oklch(0.95 0.04 25)' },
-  poison:   { bg: 'oklch(0.50 0.14 320)', fg: 'oklch(0.95 0.04 320)' },
-  ground:   { bg: 'oklch(0.55 0.10 65)',  fg: 'oklch(0.95 0.04 65)' },
-  flying:   { bg: 'oklch(0.65 0.08 260)', fg: 'oklch(0.20 0.04 260)' },
-  psychic:  { bg: 'oklch(0.60 0.14 350)', fg: 'oklch(0.95 0.04 350)' },
-  bug:      { bg: 'oklch(0.60 0.13 120)', fg: 'oklch(0.95 0.04 120)' },
-  rock:     { bg: 'oklch(0.50 0.07 70)',  fg: 'oklch(0.95 0.03 70)' },
-  ghost:    { bg: 'oklch(0.45 0.10 290)', fg: 'oklch(0.95 0.04 290)' },
-  dragon:   { bg: 'oklch(0.50 0.16 270)', fg: 'oklch(0.95 0.05 270)' },
-  dark:     { bg: 'oklch(0.35 0.04 30)',  fg: 'oklch(0.92 0.02 30)' },
-  steel:    { bg: 'oklch(0.60 0.03 230)', fg: 'oklch(0.20 0.01 230)' },
-  fairy:    { bg: 'oklch(0.75 0.10 350)', fg: 'oklch(0.20 0.04 350)' },
+  normal:   { bg: '#A8A77A', fg: '#fff' },
+  fire:     { bg: '#EE8130', fg: '#fff' },
+  water:    { bg: '#6390F0', fg: '#fff' },
+  electric: { bg: '#F7D02C', fg: '#333' },
+  grass:    { bg: '#7AC74C', fg: '#fff' },
+  ice:      { bg: '#96D9D6', fg: '#333' },
+  fighting: { bg: '#C22E28', fg: '#fff' },
+  poison:   { bg: '#A33EA1', fg: '#fff' },
+  ground:   { bg: '#E2BF65', fg: '#333' },
+  flying:   { bg: '#A98FF3', fg: '#fff' },
+  psychic:  { bg: '#F95587', fg: '#fff' },
+  bug:      { bg: '#A6B91A', fg: '#fff' },
+  rock:     { bg: '#B6A136', fg: '#fff' },
+  ghost:    { bg: '#735797', fg: '#fff' },
+  dragon:   { bg: '#6F35FC', fg: '#fff' },
+  dark:     { bg: '#705746', fg: '#fff' },
+  steel:    { bg: '#B7B7CE', fg: '#333' },
+  fairy:    { bg: '#D685AD', fg: '#fff' },
 }
 
-const FALLBACK = { bg: 'oklch(0.30 0.005 250)', fg: 'oklch(0.75 0.01 250)' }
+const FALLBACK = { bg: '#68A090', fg: '#222' }
 
 interface TypeBadgeProps {
   typeName: string
@@ -33,13 +34,13 @@ export default function TypeBadge({ typeName, small }: TypeBadgeProps) {
       style={{
         background: c.bg,
         color: c.fg,
-        padding: small ? '1px 5px' : '2px 8px',
+        padding: small ? '1px 6px' : '3px 10px',
         borderRadius: 999,
         fontSize: small ? 8 : 10,
-        fontWeight: 600,
-        letterSpacing: '0.05em',
+        fontWeight: 700,
+        letterSpacing: '0.04em',
         textTransform: 'uppercase',
-        fontFamily: 'var(--font-mono)',
+        fontFamily: 'Inter, sans-serif',
         display: 'inline-block',
         lineHeight: 1.5,
       }}

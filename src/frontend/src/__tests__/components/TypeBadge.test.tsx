@@ -12,4 +12,11 @@ describe('TypeBadge', () => {
     render(<TypeBadge typeName="cosmic" />)
     expect(screen.getByText('cosmic')).toBeInTheDocument()
   })
+
+  it('uses sans-serif font, not monospace', () => {
+    const { container } = render(<TypeBadge typeName="fire" />)
+    const span = container.querySelector('span')!
+    expect(span.style.fontFamily).toContain('Inter')
+    expect(span.style.fontFamily).not.toContain('mono')
+  })
 })
