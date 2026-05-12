@@ -14,7 +14,7 @@ from ..models.team import PokemonBuild
 from .team_loader import load_build
 from .team_analysis import analyze_team
 from .role_service import detect_roles
-from .team_scorer import score_team, compute_lead_pair_score
+from .team_scorer import score_team
 from . import regulation_service
 
 MAX_RESULTS = 5
@@ -24,6 +24,11 @@ HEURISTIC_RETRY_BUDGET = 10
 MAX_PHYSICAL_ATTACKERS = 2
 MAX_SPECIAL_ATTACKERS = 2
 MAX_TR_SETTERS = 1
+
+# Roles that must each appear at least once for a team to pass validate_team.
+REQUIRED_ROLES: frozenset[str] = frozenset({
+    "physical_attacker", "special_attacker", "speed_control", "disruption"
+})
 
 # Matches mega, gmax, and primal form suffixes — these are battle-only
 # transformations of the base species and must not share a team slot.
@@ -167,6 +172,7 @@ def _sample_candidate(
     chosen_species: set[str] = set()   # tracks _base_species() of committed members
     type_counts: dict[str, int] = {}
     role_limits: dict[str, int] = {"physical_attacker": 0, "special_attacker": 0, "trick_room_setter": 0}
+    covered_required: set[str] = set()
     members: list[dict] = []
     builds: list[PokemonBuild] = []
 
@@ -186,6 +192,7 @@ def _sample_candidate(
         for role in roles:
             if role in role_limits:
                 role_limits[role] += 1
+        covered_required.update(r for r in roles if r in REQUIRED_ROLES)
 
     # Lock in required include Pokémon first (deduplicate to avoid Rule 1 violation)
     seen_include: set[str] = set()
@@ -207,6 +214,8 @@ def _sample_candidate(
     # Fill remaining slots
     remaining_slots = 6 - len(members)
     for _ in range(remaining_slots):
+        missing_required = REQUIRED_ROLES - covered_required
+
         # Rule 1 & 2: no duplicate base species, no primary type already at 3+
         eligible = [
             e for e in pool
@@ -222,7 +231,9 @@ def _sample_candidate(
         if not eligible:
             break
 
-        # Rule 3: avoid a third physical or special sweeper, with retry budget
+        # Rules 3 + required-role coverage: prefer candidates that fill a missing
+        # required role and don't exceed role limits. When missing_required is
+        # empty the behaviour is identical to the original Rule-3-only retry.
         chosen_entry: PoolEntry | None = None
         chosen_build: PokemonBuild | None = None
         tried: set[int] = set()
@@ -238,18 +249,34 @@ def _sample_candidate(
             except ValueError:
                 continue
             roles = detect_roles(build)
+            roles_set = set(roles)
+            covers_required = not missing_required or bool(roles_set & missing_required)
             violates = (
-                ("physical_attacker" in roles and role_limits["physical_attacker"] >= MAX_PHYSICAL_ATTACKERS)
-                or ("special_attacker" in roles and role_limits["special_attacker"] >= MAX_SPECIAL_ATTACKERS)
-                or ("trick_room_setter" in roles and role_limits["trick_room_setter"] >= MAX_TR_SETTERS)
+                ("physical_attacker" in roles_set and role_limits["physical_attacker"] >= MAX_PHYSICAL_ATTACKERS)
+                or ("special_attacker" in roles_set and role_limits["special_attacker"] >= MAX_SPECIAL_ATTACKERS)
+                or ("trick_room_setter" in roles_set and role_limits["trick_room_setter"] >= MAX_TR_SETTERS)
             )
-            if not violates:
+            if covers_required and not violates:
                 chosen_entry = entry
                 chosen_build = build
                 break
 
+        if chosen_entry is None and missing_required:
+            # Relax Rule 3: find any candidate covering a required role
+            candidates = list(eligible)
+            rng.shuffle(candidates)
+            for entry in candidates:
+                try:
+                    build = load_build(conn, entry.pokemon_name, entry.set_id)
+                    if set(detect_roles(build)) & missing_required:
+                        chosen_entry = entry
+                        chosen_build = build
+                        break
+                except ValueError:
+                    continue
+
         if chosen_entry is None:
-            # Relax Rule 3: accept any eligible candidate
+            # Relax everything: accept any eligible candidate
             candidates = list(eligible)
             rng.shuffle(candidates)
             for entry in candidates:
@@ -365,9 +392,6 @@ def generate_teams(
             continue
         report = analyze_team(builds)
         if _is_acceptable(report):
-            lead = compute_lead_pair_score(builds)
-            if lead["score"] == 0.0:
-                continue
             scoring = score_team(report, builds)
             results.append({
                 "score": scoring["score"],

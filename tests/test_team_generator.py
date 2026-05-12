@@ -418,10 +418,6 @@ class TestGenerateTeams:
                 "src.api.services.team_generator.analyze_team",
                 side_effect=cycle(reports),
             ),
-            patch(
-                "src.api.services.team_generator.compute_lead_pair_score",
-                return_value={"score": 1.0, "reason": "viable lead pair"},
-            ),
         ):
             return generate_teams(conn, constraints=constraints, rng=rng)
 
@@ -526,10 +522,6 @@ class TestGenerateTeams:
                 "src.api.services.team_generator.analyze_team",
                 return_value=_valid_report(),
             ),
-            patch(
-                "src.api.services.team_generator.compute_lead_pair_score",
-                return_value={"score": 1.0, "reason": "viable lead pair"},
-            ),
         ):
             result = generate_teams(conn, constraints=c, rng=random.Random(0))
         assert result["valid_found"] > 0
@@ -570,8 +562,8 @@ class TestVGCHeuristics:
         # Should not raise — if sweeper_counts used old name, KeyError would occur
         assert len(builds) > 0
 
-    def test_generate_teams_rejects_team_with_no_viable_lead_pair(self):
-        """Teams that score 0.0 on lead_pair must be rejected."""
+    def test_generate_teams_accepts_team_with_no_viable_lead_pair(self):
+        """Teams with 0.0 lead_pair score are accepted; the score penalises them instead."""
         import random
         from unittest.mock import patch, MagicMock
         from src.api.services.team_generator import generate_teams
@@ -593,7 +585,6 @@ class TestVGCHeuristics:
             "coverage": {"covered_types": [], "missing_types": []},
             "speed_control_archetype": "tailwind",
         }
-        no_lead_pair = {"score": 0.0, "reason": "no viable lead pair"}
         scoring = {
             "score": 5.0,
             "breakdown": {
@@ -612,12 +603,11 @@ class TestVGCHeuristics:
             patch("src.api.services.team_generator._sample_candidate",
                   return_value=(self._members(), [MagicMock()] * 6)),
             patch("src.api.services.team_generator.analyze_team", return_value=valid_report),
-            patch("src.api.services.team_generator.compute_lead_pair_score",
-                  return_value=no_lead_pair),
             patch("src.api.services.team_generator.score_team", return_value=scoring),
         ):
             result = generate_teams(mock_conn, rng=rng)
-        assert result["valid_found"] == 0
+        assert result["valid_found"] > 0
+        assert result["teams"][0]["score"] == 5.0
 
     def test_generate_teams_accepts_team_with_viable_lead_pair(self):
         import random
@@ -659,8 +649,6 @@ class TestVGCHeuristics:
             patch("src.api.services.team_generator._sample_candidate",
                   return_value=(self._members(), [MagicMock()] * 6)),
             patch("src.api.services.team_generator.analyze_team", return_value=valid_report),
-            patch("src.api.services.team_generator.compute_lead_pair_score",
-                  return_value=good_lead_pair),
             patch("src.api.services.team_generator.score_team", return_value=scoring),
         ):
             result = generate_teams(mock_conn, rng=rng)
@@ -714,8 +702,6 @@ class TestGenerateTeamsWithRegulation:
                                 "speed_control_archetype": "none"}),
             patch("src.api.services.team_generator.score_team",
                   return_value={"score": 8.0, "breakdown": {}}),
-            patch("src.api.services.team_generator.compute_lead_pair_score",
-                  return_value={"score": 1.0}),
         ):
             mock_sc.return_value = (self._mock_members(), [MagicMock()] * 6)
             conn = MagicMock()
@@ -749,8 +735,6 @@ class TestGenerateTeamsWithRegulation:
                                 "speed_control_archetype": "none"}),
             patch("src.api.services.team_generator.score_team",
                   return_value={"score": 8.0, "breakdown": {}}),
-            patch("src.api.services.team_generator.compute_lead_pair_score",
-                  return_value={"score": 1.0}),
         ):
             mock_sc.return_value = (self._mock_members(), [MagicMock()] * 6)
             conn = MagicMock()
@@ -774,8 +758,6 @@ class TestGenerateTeamsWithRegulation:
                                 "speed_control_archetype": "none"}),
             patch("src.api.services.team_generator.score_team",
                   return_value={"score": 8.0, "breakdown": {}}),
-            patch("src.api.services.team_generator.compute_lead_pair_score",
-                  return_value={"score": 1.0}),
         ):
             mock_sc.return_value = (self._mock_members(), [MagicMock()] * 6)
             conn = MagicMock()
@@ -799,8 +781,6 @@ class TestGenerateTeamsWithRegulation:
                                 "speed_control_archetype": "none"}),
             patch("src.api.services.team_generator.score_team",
                   return_value={"score": 8.0, "breakdown": {}}),
-            patch("src.api.services.team_generator.compute_lead_pair_score",
-                  return_value={"score": 1.0}),
         ):
             mock_sc.return_value = (self._mock_members(), [MagicMock()] * 6)
             conn = MagicMock()
@@ -827,8 +807,6 @@ class TestGenerateTeamsWithRegulation:
                                 "speed_control_archetype": "none"}),
             patch("src.api.services.team_generator.score_team",
                   return_value={"score": 8.0, "breakdown": {}}),
-            patch("src.api.services.team_generator.compute_lead_pair_score",
-                  return_value={"score": 1.0}),
         ):
             import warnings
             mock_sc.return_value = (self._mock_members(), [MagicMock()] * 6)
