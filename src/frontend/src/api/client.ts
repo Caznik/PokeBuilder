@@ -23,6 +23,8 @@ import type {
   LoginRequest,
   RegisterRequest,
   CounterResponse,
+  BattleLogCreate,
+  BattleLogOut,
 } from './types'
 
 const BASE = '/api'
@@ -193,5 +195,22 @@ export const api = {
 
     remove: (id: number): Promise<void> =>
       del(`/regulations/${id}`),
+  },
+
+  battleLogs: {
+    list: (filters?: { regulation_id?: number; format?: string; result?: string }): Promise<BattleLogOut[]> => {
+      const params = new URLSearchParams()
+      if (filters?.regulation_id !== undefined) params.set('regulation_id', String(filters.regulation_id))
+      if (filters?.format) params.set('format', filters.format)
+      if (filters?.result) params.set('result', filters.result)
+      const qs = params.toString()
+      return get<BattleLogOut[]>(`/battle-logs/${qs ? '?' + qs : ''}`)
+    },
+    get: (id: number): Promise<BattleLogOut> =>
+      get<BattleLogOut>(`/battle-logs/${id}`),
+    create: (body: BattleLogCreate): Promise<BattleLogOut> =>
+      post<BattleLogOut>('/battle-logs/', body),
+    delete: (id: number): Promise<void> =>
+      del(`/battle-logs/${id}`),
   },
 }

@@ -251,6 +251,34 @@ export interface RegisterRequest {
   password: string
 }
 
+// Battle logs
+export interface BattleLogCreate {
+  saved_team_id?: number | null
+  regulation_id?: number | null
+  format: 'singles' | 'vgc'
+  brought_pokemon: string[]
+  enemy_team: string[]
+  enemy_brought: string[]
+  result: 'win' | 'loss' | 'tie'
+  notes?: string | null
+}
+
+export interface BattleLogOut {
+  id: number
+  user_id: number
+  saved_team_id: number | null
+  saved_team_name: string | null
+  regulation_id: number | null
+  format: string
+  brought_pokemon: string[]
+  enemy_team: string[]
+  enemy_brought: string[]
+  result: string
+  notes: string | null
+  played_at: string
+  saved_team_members: string[]
+}
+
 // Counter optimizer
 export interface CounterRequest {
   regulation_id: number

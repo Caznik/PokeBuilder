@@ -10,7 +10,7 @@ from .routes import (
     pokemon_router, ability_router, type_router, move_router, stat_router,
     competitive_router, team_router, generation_router, scoring_router,
     optimization_router, saved_teams_router, regulation_router, auth_router,
-    counter_router,
+    counter_router, battle_logs_router,
 )
 
 app = FastAPI(
@@ -45,6 +45,7 @@ app.include_router(optimization_router)
 app.include_router(saved_teams_router)
 app.include_router(regulation_router)
 app.include_router(counter_router)
+app.include_router(battle_logs_router)
 
 
 @app.get("/")

@@ -7,6 +7,7 @@ const links = [
   { to: '/optimize', label: 'Optimizer' },
   { to: '/teams', label: 'Teams' },
   { to: '/regulations', label: 'Regulations' },
+  { to: '/battle-results', label: 'Battles' },
 ]
 
 export default function Navbar() {

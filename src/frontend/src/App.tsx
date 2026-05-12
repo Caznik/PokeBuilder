@@ -7,6 +7,7 @@ import TeamOptimizer from './pages/TeamOptimizer'
 import Teams from './pages/Teams'
 import TeamDetail from './pages/TeamDetail'
 import Regulations from './pages/Regulations'
+import BattleResults from './pages/BattleResults'
 import Login from './pages/Login'
 import Register from './pages/Register'
 
@@ -39,6 +40,7 @@ function AppRoutes() {
           <Route path="/teams" element={<Teams />} />
           <Route path="/teams/:id" element={<TeamDetail />} />
           <Route path="/regulations" element={<Regulations />} />
+          <Route path="/battle-results" element={<BattleResults />} />
           <Route path="/build" element={<Navigate to="/teams" replace />} />
           <Route path="/analyze" element={<Navigate to="/teams" replace />} />
           <Route path="/saved" element={<Navigate to="/teams?tab=saved" replace />} />
