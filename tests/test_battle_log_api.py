@@ -24,9 +24,11 @@ _LOG_OUT = BattleLogOut(
     format="singles",
     brought_pokemon=["charizard", "blastoise", "venusaur"],
     enemy_team=["pikachu", "mewtwo"],
+    enemy_brought=[],
     result="win",
     notes=None,
     played_at=_NOW,
+    saved_team_members=[],
 )
 
 _VALID_CREATE_PAYLOAD = {

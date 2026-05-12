@@ -39,9 +39,11 @@ _DB_ROW = (
     "singles",  # format
     ["charizard", "blastoise", "venusaur"],  # brought_pokemon
     ["pikachu", "mewtwo"],                   # enemy_team
+    [],         # enemy_brought
     "win",      # result
     None,       # notes
     _NOW,       # played_at
+    [],         # saved_team_members
 )
 
 

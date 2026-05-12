@@ -1,6 +1,7 @@
 # tests/test_battle_log_fetcher.py
 """Unit tests for battle_log_fetcher — HTTP and DB interactions are mocked."""
 
+import json
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch, call
 
@@ -19,10 +20,13 @@ class TestFetchReplayIds:
         ]
 
         with patch("src.ingestors.battle_log_fetcher.requests.get") as mock_get:
-            mock_resp = MagicMock()
-            mock_resp.json.side_effect = [batch, []]
-            mock_resp.raise_for_status.return_value = None
-            mock_get.return_value = mock_resp
+            mock_resp1 = MagicMock()
+            mock_resp1.text = json.dumps(batch)
+            mock_resp1.raise_for_status.return_value = None
+            mock_resp2 = MagicMock()
+            mock_resp2.text = "[]"
+            mock_resp2.raise_for_status.return_value = None
+            mock_get.side_effect = [mock_resp1, mock_resp2]
 
             ids = fetch_replay_ids("[Gen 9 Champions] VGC 2026 Reg M-A", since)
 
@@ -39,7 +43,7 @@ class TestFetchReplayIds:
 
         with patch("src.ingestors.battle_log_fetcher.requests.get") as mock_get:
             mock_resp = MagicMock()
-            mock_resp.json.return_value = batch
+            mock_resp.text = json.dumps(batch)
             mock_resp.raise_for_status.return_value = None
             mock_get.return_value = mock_resp
 

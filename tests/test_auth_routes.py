@@ -190,7 +190,7 @@ def test_google_callback_success():
          patch("src.api.routes.auth.create_access_token", return_value="acc.tok.en"):
         response = client.get("/auth/google/callback", follow_redirects=False)
     assert response.status_code in (302, 307)
-    assert response.headers["location"] == "/teams"
+    assert response.headers["location"] == "http://localhost:5173/teams"
     assert "access_token" in response.cookies
 
 
