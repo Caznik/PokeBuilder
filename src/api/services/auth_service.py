@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from authlib.integrations.starlette_client import OAuth
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, Request, Response, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -140,11 +140,12 @@ def revoke_refresh_token(conn: Any, raw_token: str) -> None:
     conn.commit()
 
 
-def get_current_user(request: Request) -> UserOut:
-    """FastAPI dependency: validate access_token cookie and return the current user.
+def get_current_user(request: Request, response: Response) -> UserOut:
+    """FastAPI dependency: validate access_token cookie, slide its expiry, and return the current user.
 
     Args:
         request: The incoming FastAPI request (used to read cookies).
+        response: Used to re-issue a fresh access_token cookie on every request.
 
     Returns:
         UserOut with id and email extracted from the JWT.
@@ -156,4 +157,10 @@ def get_current_user(request: Request) -> UserOut:
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     payload = decode_access_token(token)
-    return UserOut(id=int(payload["sub"]), email=payload["email"])
+    user = UserOut(id=int(payload["sub"]), email=payload["email"])
+    new_token = create_access_token(user.id, user.email)
+    response.set_cookie(
+        "access_token", new_token,
+        httponly=True, samesite="lax", max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+    return user
