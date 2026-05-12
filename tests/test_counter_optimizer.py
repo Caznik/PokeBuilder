@@ -16,19 +16,34 @@ class TestScorePartial:
     def test_zero_when_no_win_rate_data(self):
         from src.api.services.counter_optimizer import _score_partial
         partial = [("koraidon", 1), ("incineroar", 2)]
-        assert _score_partial(partial, {}) == 0.0
+        assert _score_partial(partial, {}, frozenset(), 0) == 0.0
 
     def test_mean_of_member_win_rates(self):
         from src.api.services.counter_optimizer import _score_partial
         partial = [("koraidon", 1), ("incineroar", 2)]
         rates = {"koraidon": 0.8, "incineroar": 0.6}
-        assert _score_partial(partial, rates) == pytest.approx(0.7)
+        assert _score_partial(partial, rates, frozenset(), 0) == pytest.approx(0.7)
 
     def test_missing_pokemon_treated_as_zero(self):
         from src.api.services.counter_optimizer import _score_partial
         partial = [("koraidon", 1), ("unknown", 2)]
         rates = {"koraidon": 1.0}
-        assert _score_partial(partial, rates) == pytest.approx(0.5)
+        assert _score_partial(partial, rates, frozenset(), 0) == pytest.approx(0.5)
+
+    def test_role_coverage_bonus_added(self):
+        from src.api.services.counter_optimizer import _score_partial, _ROLE_COVERAGE_BONUS
+        partial = [("incineroar", 1)]
+        rates = {"incineroar": 0.6}
+        covered = frozenset({"physical_attacker", "disruption"})
+        expected = 0.6 + 2 * _ROLE_COVERAGE_BONUS
+        assert _score_partial(partial, rates, covered, 0) == pytest.approx(expected)
+
+    def test_type_diversity_bonus_added(self):
+        from src.api.services.counter_optimizer import _score_partial, _TYPE_DIVERSITY_BONUS
+        partial = [("koraidon", 1), ("incineroar", 2)]
+        rates = {"koraidon": 0.6, "incineroar": 0.6}
+        expected = 0.6 + 3 * _TYPE_DIVERSITY_BONUS  # 3 distinct types
+        assert _score_partial(partial, rates, frozenset(), 3) == pytest.approx(expected)
 
 
 class TestSuggestCounterTeam:
@@ -68,6 +83,8 @@ class TestSuggestCounterTeam:
                                                     "rillaboom", "urshifu", "farigiraf"})),
             patch("src.api.services.counter_optimizer._build_pool", return_value=pool),
             patch("src.api.services.counter_optimizer.load_build", return_value=MagicMock(nature="timid", ability="orichalcum-pulse")),
+            patch("src.api.services.counter_optimizer.detect_roles",
+                  return_value=["physical_attacker", "special_attacker", "speed_control", "disruption"]),
             patch("src.api.services.counter_optimizer.analyze_team", return_value={
                 "valid": True, "issues": [], "roles": {}, "weaknesses": {},
                 "resistances": {}, "coverage": {"covered_types": [], "missing_types": []},

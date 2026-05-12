@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import type { TeamResult } from '../api/types'
+import type { TeamResult, GenerationMember } from '../api/types'
 import ScoreBar from './ScoreBar'
 import BreakdownTable from './BreakdownTable'
 import AnalysisReport from './AnalysisReport'
+import SetDetailModal from './SetDetailModal'
 
 interface TeamResultCardProps {
   team: TeamResult
@@ -15,6 +16,7 @@ function titleCase(name: string): string {
 }
 
 export default function TeamResultCard({ team, rank, onSave }: TeamResultCardProps) {
+  const [selectedMember, setSelectedMember] = useState<GenerationMember | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveInput, setSaveInput] = useState('')
   const [showSaveInput, setShowSaveInput] = useState(false)
@@ -105,14 +107,24 @@ export default function TeamResultCard({ team, rank, onSave }: TeamResultCardPro
       {/* Members */}
       <div className="flex flex-wrap gap-2">
         {team.members.map((m, i) => (
-          <div key={i} className="rounded px-3 py-1.5 text-center" style={{ background: 'var(--surface-2)' }}>
+          <button
+            key={i}
+            onClick={() => setSelectedMember(m)}
+            className="rounded px-3 py-1.5 text-center"
+            style={{
+              background: 'var(--surface-2)', border: '1px solid transparent',
+              cursor: 'pointer', transition: 'border-color 0.15s',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)' }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'transparent' }}
+          >
             <div className="text-sm font-medium" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{titleCase(m.pokemon_name)}</div>
             <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
               {m.set_name
                 ? m.set_name
                 : [m.nature, m.ability].filter((x): x is string => x !== null && x !== undefined).map(titleCase).join(' · ') || null}
             </div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -135,6 +147,10 @@ export default function TeamResultCard({ team, rank, onSave }: TeamResultCardPro
           <AnalysisReport analysis={team.analysis} />
         </div>
       </details>
+
+      {selectedMember !== null && (
+        <SetDetailModal member={selectedMember} onClose={() => setSelectedMember(null)} />
+      )}
     </div>
   )
 }
