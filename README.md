@@ -1,6 +1,6 @@
 # PokeBuilder
 
-A full-stack VGC (Video Game Championship) Pokémon team-building and analysis platform. Generate, optimize, score, and save competitive Pokémon teams using real Smogon/Pikalytics data and battle replay meta analysis.
+A full-stack VGC Pokémon team-building and analysis platform. Generate, optimize, score, and save competitive Pokémon teams using real Smogon/Pikalytics data and battle replay meta analysis.
 
 ---
 
