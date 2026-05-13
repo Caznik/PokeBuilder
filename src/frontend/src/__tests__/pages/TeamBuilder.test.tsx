@@ -14,6 +14,7 @@ vi.mock('../../api/client', () => ({
     competitiveSets: { get: vi.fn() },
     team: { score: vi.fn(), analyze: vi.fn() },
     savedTeams: { save: vi.fn() },
+    regulations: { list: vi.fn() },
   },
 }))
 
@@ -71,6 +72,7 @@ beforeEach(() => {
   user = userEvent.setup()
   vi.resetAllMocks()
   vi.mocked(api.types.list).mockResolvedValue([])
+  vi.mocked(api.regulations.list).mockResolvedValue([])
   vi.mocked(api.pokemon.list).mockResolvedValue({
     total: 1,
     page: 1,

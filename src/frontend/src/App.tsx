@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
+import Dashboard from './pages/Dashboard'
 import PokemonBrowser from './pages/PokemonBrowser'
 import TeamGenerator from './pages/TeamGenerator'
 import TeamOptimizer from './pages/TeamOptimizer'
@@ -31,9 +32,10 @@ function AppRoutes() {
       <Navbar />
       <main className="max-w-5xl mx-auto px-4 py-6">
         <Routes>
-          <Route path="/" element={<Navigate to="/pokemon" replace />} />
-          <Route path="/login" element={<Navigate to="/pokemon" replace />} />
-          <Route path="/register" element={<Navigate to="/pokemon" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/register" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/pokemon" element={<PokemonBrowser />} />
           <Route path="/generate" element={<TeamGenerator />} />
           <Route path="/optimize" element={<TeamOptimizer />} />

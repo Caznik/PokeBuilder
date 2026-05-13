@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const links = [
+  { to: '/dashboard', label: 'Dashboard' },
   { to: '/pokemon', label: 'Pokémon' },
   { to: '/generate', label: 'Generator' },
   { to: '/optimize', label: 'Optimizer' },
